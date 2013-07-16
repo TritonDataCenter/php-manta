@@ -5,7 +5,7 @@
  * Provides a simple class library for accessing the Joyent Manta Services via the REST API
  */
 
-class Manta {
+class MantaClient {
   // Properties
   protected $endpoint = NULL;
   protected $login = NULL;
@@ -21,7 +21,7 @@ class Manta {
    * @param login     Manta login
    * @param keyid     Manta keyid
    * @param priv_key  Client SSH private key
-   * @param algo      Algorithm to use for signatures; valid values are RSA-SHA1, RSA-SHA256, DSA-SHA.  Check your system for which are supported.
+   * @param algo      Algorithm to use for signatures; valid values are RSA-SHA1, RSA-SHA256, DSA-SHA
    * @param curlopts  Additional curl options to set for requests
    */
   public function __construct($endpoint, $login, $keyid, $priv_key, $algo = 'RSA-SHA256', $curlopts = array()) {
@@ -51,11 +51,23 @@ class Manta {
 
   /**
    * Internal method to execute REST service call
+   *
+   * @param method        HTTP method (GET, POST, PUT, DELETE)
+   * @param url           Service portion of URL
+   * @param headers       Additional HTTP headers to send with request
+   * @param data          Data to send with PUT or POST requests
+   * @param resp_headers  Set to TRUE to return response headers as well as resp data
+   *
+   * @return Raw resp data is returned on success; if resp_headers is set, then an array containing 'headers' and 'data' elements is returned
+   * @throws Exception on error
    */
-  protected function execute($method, $url, $headers = array(), $data = NULL) {
+  protected function execute($method, $url, $headers = array(), $data = NULL, $resp_headers = FALSE) {
     $retval = FALSE;
 
     // Prepare authorization headers
+    if (!$headers) {
+      $headers = array();
+    }
     $headers[] = $this->getAuthorization($headers[] = 'date: ' . date('r'));
 
     // Create a new cURL resource
@@ -63,7 +75,7 @@ class Manta {
     if ($ch) {
       // Set required curl options
       $curlopts = array(
-        CURLOPT_HEADER => FALSE,
+        CURLOPT_HEADER => $resp_headers,
         CURLOPT_RETURNTRANSFER => TRUE,
         CURLOPT_URL => "{$this->endpoint}/{$this->login}/{$url}",
         CURLOPT_CUSTOMREQUEST => $method,
@@ -99,7 +111,22 @@ class Manta {
             throw new Exception($msg, $info['http_code']);
           }
           else {
-            $retval = $resp;
+            if (!$resp_headers) {
+              $retval = $resp;
+            }
+            else {
+              // Split out response headers into name => value array
+              list($headers, $data) = explode("\r\n\r\n", $resp, 2);
+              $headers = explode("\r\n", $headers);
+              foreach ($headers as $header) {
+                if ('HTTP' == substr($header, 0, 4)) {
+                  continue;
+                }
+                list($name, $value) = explode(':', $header, 2);
+                $retval['headers'][trim($name)] = trim($value);
+              }
+              $retval['data'] = $data;
+            }
           }
         }
         else {
@@ -155,7 +182,7 @@ class Manta {
    *
    * @param directory   Name of directory
    *
-   * @return Array of object information in the requested directory
+   * @return Array with 'headers' and 'data' elements where 'data' contains the list of items
    * @throws Exception on error
    */
   public function ListDirectory($directory = '') {
@@ -163,13 +190,16 @@ class Manta {
     $headers = array(
       'Content-Type: application/x-json-stream; type=directory',
     );
-    $result = $this->execute('GET', "stor/{$directory}", $headers);
-    if (!empty($result) && is_string($result)) {
-      $items = explode("\n", $result);
+    $result = $this->execute('GET', "stor/{$directory}", $headers, NULL, TRUE);
+    $retval['headers'] = $result['headers'];
+    $retval['data'] = array();
+
+    if (!empty($result['data']) && is_string($result['data'])) {
+      $items = explode("\n", $result['data']);
       foreach ($items as $item) {
         $item_decode = json_decode($item, TRUE);
         if (!empty($item_decode)) {
-          $retval[] = $item_decode;
+          $retval['data'][] = $item_decode;
         }
       }
     }
@@ -225,12 +255,12 @@ class Manta {
    * @param object        Name of object
    * @param directory     Name of directory
    *
-   * @return Object data on success
+   * @return Array with 'headers' and 'data' elements
    * @throws Exception on error
    */
   public function GetObject($object, $directory = NULL) {
     $objpath = !empty($directory) ? "{$directory}/{$object}" : $object;
-    $result = $this->execute('GET', "stor/{$objpath}");
+    $result = $this->execute('GET', "stor/{$objpath}", NULL, NULL, TRUE);
     return $result;
   }
 
@@ -260,9 +290,10 @@ class Manta {
    */
   public function PutSnapLink($link, $source) {
     $headers = array(
-      'Content-Type: application/json; type=directory',
+      'Content-Type: application/json; type=link',
+      "Location: /{$this->login}/stor/{$source}",
     );
-    $result = $this->execute('PUT', "stor/{$directory}", $headers);
+    $result = $this->execute('PUT', "stor/{$link}", $headers);
     return TRUE;
   }
 }
