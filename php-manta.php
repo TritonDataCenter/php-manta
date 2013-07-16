@@ -1,4 +1,15 @@
 <?php
+/*! \mainpage
+ *
+ * This class library is unofficial, unsanctioned, and unsupported by Joyent, and is built based on their public REST API service documentation located here:
+ *
+ * http://apidocs.joyent.com/manta/api.html
+ *
+ * The code currently resides on BitBucket here:
+ *
+ * http://git.octobang.com/php-manta
+ */
+
 /**
  * @file
  *
