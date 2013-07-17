@@ -16,6 +16,9 @@
  * Provides a simple class library for accessing the Joyent Manta Services via the REST API
  */
 
+/**
+ * Manta client class for interaction with the REST API service endpoint
+ */
 class MantaClient {
   // Properties
   protected $endpoint = NULL;
@@ -161,6 +164,38 @@ class MantaClient {
   }
 
   /**
+   * Util method to parse a newline-delimited list of JSON objects into an array
+   */
+  protected function parseJSONList($data) {
+    $retval = array();
+    $items = explode("\n", $data);
+    foreach ($items as $item) {
+      $item_decode = json_decode($item, TRUE);
+      if (!empty($item_decode)) {
+        $retval[] = $item_decode;
+      }
+    }
+
+    return $retval;
+  }
+
+  /**
+   * Util method to parse a newline-delimited list of strings into an array, with trimming
+   */
+  protected function parseTextList($data) {
+    $retval = array();
+    $items = explode("\n", $data);
+    foreach ($items as $item) {
+      $item = trim($item);
+      if (!empty($item)) {
+        $retval[] = $item;
+      }
+    }
+
+    return $retval;
+  }
+
+  /**
    * http://apidocs.joyent.com/manta/api.html#PutDirectory
    *
    * @param directory     Name of directory
@@ -202,18 +237,10 @@ class MantaClient {
       'Content-Type: application/x-json-stream; type=directory',
     );
     $result = $this->execute('GET', "stor/{$directory}", $headers, NULL, TRUE);
-    $retval['headers'] = $result['headers'];
-    $retval['data'] = array();
 
-    if (!empty($result['data']) && is_string($result['data'])) {
-      $items = explode("\n", $result['data']);
-      foreach ($items as $item) {
-        $item_decode = json_decode($item, TRUE);
-        if (!empty($item_decode)) {
-          $retval['data'][] = $item_decode;
-        }
-      }
-    }
+    $retval['headers'] = $result['headers'];
+    $retval['data'] = $this->parseJSONList($result['data']);
+
     return $retval;
   }
 
@@ -306,5 +333,204 @@ class MantaClient {
     );
     $result = $this->execute('PUT', "stor/{$link}", $headers);
     return TRUE;
+  }
+
+  /**
+   * http://apidocs.joyent.com/manta/api.html#CreateJob
+   *
+   * @param name      Name of job
+   * @param phases    Array of MantaJobPhase objects
+   *
+   * @return Array with 'headers' and 'data' elements
+   * @throws Exception on error
+   */
+  public function CreateJob($name, $phases) {
+    $headers = array(
+      'Content-Type: application/json',
+    );
+    $data = json_encode($phases);
+    $result = $this->execute('POST', "jobs", $headers, $data, TRUE);
+
+    // Extract the job ID if it was returned
+    if (!empty($result['headers']['Location'])) {
+      $result['headers']['job_id'] = array_pop(explode('/', $result['headers']['Location']));
+    }
+
+    return $result;
+  }
+
+  /**
+   * http://apidocs.joyent.com/manta/api.html#AddJobInputs
+   *
+   * @param job_id    Job id returned by CreateJob
+   * @param inputs    Array of object names to use as inputs
+   *
+   * @return TRUE on success
+   * @throws Exception on error
+   */
+  public function AddJobInputs($job_id, $inputs) {
+    $headers = array(
+      'Content-Type: text/plain',
+    );
+    $data = implode("\n", $inputs);
+    $result = $this->execute('POST', "jobs/{$job_id}/live/in", $headers, $data);
+    return $result;
+  }
+
+  /**
+   * http://apidocs.joyent.com/manta/api.html#EndJobInput
+   *
+   * @param job_id    Job id returned by CreateJob
+   *
+   * @return TRUE on success
+   * @throws Exception on error
+   */
+  public function EndJobInput($job_id) {
+    $result = $this->execute('POST', "jobs/{$job_id}/live/in/end");
+    return $result;
+  }
+
+  /**
+   * http://apidocs.joyent.com/manta/api.html#CancelJob
+   *
+   * @param job_id    Job id returned by CreateJob
+   *
+   * @return TRUE on success
+   * @throws Exception on error
+   */
+  public function CancelJob($job_id) {
+    $result = $this->execute('POST', "jobs/{$job_id}/live/cancel");
+    return $result;
+  }
+
+  /**
+   * http://apidocs.joyent.com/manta/api.html#ListJobs
+   *
+   * @return Array with 'headers' and 'data' elements where 'data' contains the list of items
+   * @throws Exception on error
+   */
+  public function ListJobs() {
+    $retval = array();
+    $result = $this->execute('GET', "jobs", NULL, NULL, TRUE);
+
+    $retval['headers'] = $result['headers'];
+    $retval['data'] = $this->parseJSONList($result['data']);
+
+    return $retval;
+  }
+
+  /**
+   * http://apidocs.joyent.com/manta/api.html#GetJob
+   *
+   * @param job_id    Job id returned by CreateJob
+   *
+   * @return Job container object
+   * @throws Exception on error
+   */
+  public function GetJob($job_id) {
+    $result = $this->execute('GET', "jobs/{$job_id}/live/status", NULL, NULL, TRUE);
+    $retval = json_decode($result['data']);
+    return $retval;
+  }
+
+  /**
+   * http://apidocs.joyent.com/manta/api.html#GetJobOutput
+   *
+   * @param job_id    Job id returned by CreateJob
+   *
+   * @return Array with 'headers' and 'data' elements where 'data' contains the list of output objects
+   * @throws Exception on error
+   */
+  public function GetJobOutput($job_id) {
+    $retval = array();
+    $result = $this->execute('GET', "jobs/{$job_id}/live/out", NULL, NULL, TRUE);
+
+    $retval['headers'] = $result['headers'];
+    $retval['data'] = $this->parseTextList($result['data']);
+
+    return $retval;
+  }
+
+  /**
+   * http://apidocs.joyent.com/manta/api.html#GetJobInput
+   *
+   * @param job_id    Job id returned by CreateJob
+   *
+   * @return Array with 'headers' and 'data' elements where 'data' contains the list of input objects
+   * @throws Exception on error
+   */
+  public function GetJobInput($job_id) {
+    $retval = array();
+    $result = $this->execute('GET', "jobs/{$job_id}/live/in", NULL, NULL, TRUE);
+
+    $retval['headers'] = $result['headers'];
+    $retval['data'] = $this->parseTextList($result['data']);
+
+    return $retval;
+  }
+
+  /**
+   * http://apidocs.joyent.com/manta/api.html#GetJobFailures
+   *
+   * @param job_id    Job id returned by CreateJob
+   *
+   * @return Array with 'headers' and 'data' elements where 'data' contains the list of error objects
+   * @throws Exception on error
+   */
+  public function GetJobFailures($job_id) {
+    $retval = array();
+    $result = $this->execute('GET', "jobs/{$job_id}/live/fail", NULL, NULL, TRUE);
+
+    $retval['headers'] = $result['headers'];
+    $retval['data'] = $this->parseTextList($result['data']);
+
+    return $retval;
+  }
+
+  /**
+   * http://apidocs.joyent.com/manta/api.html#GetJobErrors
+   *
+   * @param job_id    Job id returned by CreateJob
+   *
+   * @return Array with 'headers' and 'data' elements where 'data' contains the errors
+   * @throws Exception on error
+   */
+  public function GetJobErrors($job_id) {
+    $retval = array();
+    $result = $this->execute('GET', "jobs/{$job_id}/live/err", NULL, NULL, TRUE);
+
+    $retval['headers'] = $result['headers'];
+    $retval['data'] = $this->parseJSONList($result['data']);
+
+    return $retval;
+  }
+
+}
+
+/**
+ * Manta job phase convenience class for constructing a valid job phase object
+ * http://apidocs.joyent.com/manta/api.html#CreateJob
+ */
+class MantaJobPhase {
+  /**
+   * Construction
+   *
+   * @param phase   Array of Manta job phase options
+   */
+  public function __construct($phase) {
+    $props = array(
+      'type',
+      'assets',
+      'exec',
+      'init',
+      'count',
+      'memory',
+      'disk',
+    );
+    foreach ($props as $prop) {
+      if (isset($phase[$prop])) {
+        $this->{$prop} = $phase[$prop];
+      }
+    }
   }
 }
