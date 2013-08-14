@@ -256,12 +256,14 @@ class MantaClient {
   public function DeleteDirectory($directory, $recursive = FALSE) {
     if ($recursive) {
       $items = $this->ListDirectory($directory);
-      foreach ($items as $item) {
-        if ('directory' == $item['type']) {
-          $this->DeleteDirectory("{$directory}/{$item['name']}", TRUE);
-        }
-        elseif ('object' == $item['type']) {
-          $this->DeleteObject($item['name'], $directory, TRUE);
+      foreach ($items['data'] as $item) {
+        if (!empty($item['type'])) {
+          if ('directory' == $item['type']) {
+            $this->DeleteDirectory("{$directory}/{$item['name']}", TRUE);
+          }
+          elseif ('object' == $item['type']) {
+            $this->DeleteObject($item['name'], $directory);
+          }
         }
       }
     }
