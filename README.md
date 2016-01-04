@@ -1,6 +1,6 @@
 # PHP Manta
 
-[php-manta](http://joyent.github.com/php-manta) is a community-maintained Java SDK for interacting with Joyent's 
+[php-manta](http://joyent.github.com/php-manta) is a community-maintained PHP SDK for interacting with Joyent's 
 Manta system.
 
 ## Contributing
