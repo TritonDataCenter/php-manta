@@ -8,10 +8,12 @@
   "license": "MPL-2.0",
   "authors": [
     {
-      "name": "Robert Bates"
+      "name": "Robert Bates",
+      "role": "Developer"
     },
     {
-      "name": "Elijah Zupancic"
+      "name": "Elijah Zupancic",
+      "role": "Developer"
     }
   ],
   "support": {
