@@ -1,5 +1,6 @@
 {
   "name": "joyent/php-manta",
+  "version": "2.0.0-alpha1",
   "homepage": "https://github.com/joyent/php-manta",
   "description": "Joyent Manta Object Store SDK for PHP",
   "keywords": ["joyent", "manta", "object store", "sdk"],
