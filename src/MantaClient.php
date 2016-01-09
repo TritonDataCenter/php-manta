@@ -1,7 +1,7 @@
-<?php
+<?php namespace Joyent\Manta;
 /*! \mainpage
+ * TODO: Write me
  */
-namespace Joyent\Manta;
 
 /**
  * @file

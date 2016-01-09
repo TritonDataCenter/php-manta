@@ -32,6 +32,6 @@
     "psr-4": {
       "Joyent\\Manta\\": "src/"
     },
-    "files": ["src/php-manta.php"]
+    "files": ["src/MantaClient.php"]
   }
 }
