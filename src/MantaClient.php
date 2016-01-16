@@ -115,7 +115,7 @@ class MantaClient {
               $msg = $error['code'] . ': ' . $error['message'];
             }
 
-            throw new Exception($msg, $info['http_code']);
+            throw new MantaException($msg, $info['http_code']);
           }
           else {
             if (!$resp_headers) {
@@ -137,7 +137,7 @@ class MantaClient {
           }
         }
         else {
-          throw new Exception(curl_error($ch), curl_errno($ch));
+          throw new MantaException(curl_error($ch), curl_errno($ch));
         }
       }
       catch (Exception $e) {
@@ -150,7 +150,7 @@ class MantaClient {
       curl_close($ch);
     }
     else {
-      throw new Exception('Unable to initialize curl session');
+      throw new MantaException('Unable to initialize curl session');
     }
 
     return $retval;
