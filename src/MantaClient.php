@@ -6,7 +6,8 @@
 /**
  * @file
  *
- * Provides a simple class library for accessing the Joyent Manta Services via the REST API
+ * Provides a simple class library for accessing the Joyent Manta Services via
+ * the REST API
  */
 
 /**
@@ -24,14 +25,15 @@ class MantaClient {
   /**
    * Construction
    *
-   * @param endpoint  Manta endpoint to use for requests (e.g. https://us-east.manta.joyent.com)
-   * @param login     Manta login
-   * @param keyid     Manta keyid
-   * @param priv_key  Client SSH private key
-   * @param algo      Algorithm to use for signatures; valid values are RSA-SHA1, RSA-SHA256, DSA-SHA
-   * @param curlopts  Additional curl options to set for requests
+   * @param string endpoint  Manta endpoint to use for requests (e.g. https://us-east.manta.joyent.com)
+   * @param string login     Manta login
+   * @param string keyid     Manta keyid
+   * @param string priv_key  Client SSH private key
+   * @param string algo      Algorithm to use for signatures; valid values are RSA-SHA1, RSA-SHA256, DSA-SHA
+   * @param array curlopts  Additional curl options to set for requests
    */
-  public function __construct($endpoint, $login, $keyid, $priv_key, $algo = 'RSA-SHA256', $curlopts = array()) {
+  public function __construct($endpoint, $login, $keyid, $priv_key,
+                              $algo = 'RSA-SHA256', $curlopts = array()) {
     $this->endpoint = $endpoint;
     $this->login = $login;
     $this->keyid = $keyid;
@@ -75,7 +77,7 @@ class MantaClient {
     if (!$headers) {
       $headers = array();
     }
-    $headers[] = $this->getAuthorization($headers[] = 'date: ' . date('r'));
+    $headers[] = $this->getAuthorization($headers[] = 'date: ' . gmdate('r'));
 
     // Create a new cURL resource
     $ch = curl_init();
