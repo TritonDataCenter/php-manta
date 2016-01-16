@@ -14,32 +14,85 @@
  * Manta client class for interaction with the REST API service endpoint
  */
 class MantaClient {
+    const MANTA_URL_ENV_KEY             = 'MANTA_URL';
+    const MANTA_USER_ENV_KEY            = 'MANTA_USER';
+    const MANTA_KEY_ID_ENV_KEY          = "MANTA_KEY_ID";
+    const MANTA_KEY_PATH_ENV_KEY        = 'MANTA_KEY_PATH';
+    const DEFAULT_MANTA_URL             = 'https://us-east.manta.joyent.com:443';
+    const DEFAULT_MANTA_KEY_PATH_SUFFIX = "/.ssh/id_rsa";
+    const DEFAULT_HTTP_SIGN_ALGO        = 'RSA-SHA256';
+    const DEFAULT_CURL_OPTS             = array();
+    const MAXIMUM_PRIV_KEY_SIZE         = 51200;
+
   // Properties
   protected $endpoint = NULL;
   protected $login = NULL;
   protected $keyid = NULL;
   protected $algo = NULL;
-  protected $priv_key = NULL;
+  protected $privateKeyContents = NULL;
   protected $curlopts = NULL;
 
   /**
    * Construction
    *
-   * @param string endpoint  Manta endpoint to use for requests (e.g. https://us-east.manta.joyent.com)
-   * @param string login     Manta login
-   * @param string keyid     Manta keyid
-   * @param string priv_key  Client SSH private key
-   * @param string algo      Algorithm to use for signatures; valid values are RSA-SHA1, RSA-SHA256, DSA-SHA
-   * @param array curlopts  Additional curl options to set for requests
+   * @param string endpoint            Manta endpoint to use for requests (e.g. https://us-east.manta.joyent.com)
+   * @param string login               Manta login
+   * @param string keyid               Manta keyid
+   * @param string privateKeyContents  Client SSH private key
+   * @param string algo                Algorithm to use for signatures; valid values are RSA-SHA1, RSA-SHA256, DSA-SHA
+   * @param array curlopts             Additional curl options to set for requests
    */
-  public function __construct($endpoint, $login, $keyid, $priv_key,
-                              $algo = 'RSA-SHA256', $curlopts = array()) {
-    $this->endpoint = $endpoint;
-    $this->login = $login;
-    $this->keyid = $keyid;
-    $this->algo = $algo;
-    $this->priv_key = $priv_key;
-    $this->curlopts = $curlopts;
+  public function __construct($endpoint = null,
+                              $login = null,
+                              $keyid = null,
+                              $privateKeyContents = null,
+                              $algo = null,
+                              $curlopts = null)
+  {
+    $this->endpoint = self::paramEnvOrDefault($endpoint, self::MANTA_URL_ENV_KEY,
+        self::DEFAULT_MANTA_URL, "endpoint");
+    $this->login = self::paramEnvOrDefault($login, self::MANTA_USER_ENV_KEY, null,
+        "login");
+    $this->keyid = self::paramEnvOrDefault($keyid, self::MANTA_KEY_ID_ENV_KEY, null,
+        "keyid");
+
+    if (!is_null($privateKeyContents) && !empty($privateKeyContents)) {
+        $this->privateKeyContents = $privateKeyContents;
+    } else {
+        $keyPath = self::paramEnvOrDefault($privateKeyContents, self::MANTA_KEY_PATH_ENV_KEY,
+            getenv('HOME') . self::DEFAULT_MANTA_KEY_PATH_SUFFIX, "priv_key");
+        $contents = file_get_contents($keyPath, false, null, null,
+            self::MAXIMUM_PRIV_KEY_SIZE);
+        $this->privateKeyContents = $contents;
+    }
+
+    $this->algo = self::paramEnvOrDefault($algo, null, self::DEFAULT_HTTP_SIGN_ALGO,
+          "algo");
+    $this->curlopts = self::paramEnvOrDefault($curlopts, null, self::DEFAULT_CURL_OPTS,
+        "curlopts");
+  }
+
+  protected static function paramEnvOrDefault($argValue, $envKey,
+                                       $default = null, $argName = null) {
+      if (!is_null($argValue) && !empty($argValue)) {
+          return $argValue;
+      }
+
+      if (!is_null($envKey)) {
+          $envValue = getenv($envKey);
+
+          if (!is_null($envValue) && !empty($envValue)) {
+              return $envValue;
+          }
+      }
+
+      if (!is_null($default) && (!empty($default) || !is_string($default))) {
+          return $default;
+      }
+
+      $msg = "You must set the [$argName] argument explicitly or set the " .
+             "environment variable [$envKey]";
+      throw new \InvalidArgumentException($msg);
   }
 
   /**
@@ -50,7 +103,7 @@ class MantaClient {
    * @return Fully encoded authorization header
    */
   protected function getAuthorization($data) {
-    $pkeyid = openssl_get_privatekey($this->priv_key);
+    $pkeyid = openssl_get_privatekey($this->privateKeyContents);
     $sig = '';
     openssl_sign($data, $sig, $pkeyid, $this->algo);
     $sig = base64_encode($sig);
