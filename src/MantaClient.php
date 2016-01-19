@@ -1,14 +1,16 @@
 <?php namespace Joyent\Manta;
 /**
- * This is a simple class library for accessing the Joyent Manta Services via
+ * This is a library for accessing the Joyent Manta Services via
  * the public or the private cloud.
  */
-use Exception;
+
+/** We import Exception explicitly because if we don't it confuses phpDocumentor. */
+use \Exception;
 
 /**
  * Manta client class for interacting with the Manta REST API service endpoint.
  *
- * @see More information about Manta https://www.joyent.com/object-storage
+ * @see https://www.joyent.com/object-storage More information about Manta
  * @copyright 2016 Joyent Inc.
  * @license https://www.mozilla.org/en-US/MPL/2.0/
  * @author Robert Bates
