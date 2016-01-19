@@ -1,4 +1,5 @@
 <?php namespace Joyent\Manta;
+
 /*! \mainpage
  * TODO: Write me
  */
@@ -24,14 +25,15 @@ class MantaClient
     const DEFAULT_HTTP_SIGN_ALGO = 'RSA-SHA256';
     const DEFAULT_CURL_OPTS = array();
     const MAXIMUM_PRIV_KEY_SIZE = 51200;
+    const AUTH_HEADER = 'Authorization: Signature keyId="/%s/keys/%s",algorithm="%s",signature="%s"';
 
     // Properties
-    protected $endpoint = NULL;
-    protected $login = NULL;
-    protected $keyid = NULL;
-    protected $algo = NULL;
-    protected $privateKeyContents = NULL;
-    protected $curlopts = NULL;
+    protected $endpoint = null;
+    protected $login = null;
+    protected $keyid = null;
+    protected $algo = null;
+    protected $privateKeyContents = null;
+    protected $curlopts = null;
 
     /**
      * Construction
@@ -43,39 +45,74 @@ class MantaClient
      * @param string algo                Algorithm to use for signatures; valid values are RSA-SHA1, RSA-SHA256, DSA-SHA
      * @param array curlopts             Additional curl options to set for requests
      */
-    public function __construct($endpoint = null,
-                                $login = null,
-                                $keyid = null,
-                                $privateKeyContents = null,
-                                $algo = null,
-                                $curlopts = null)
-    {
-        $this->endpoint = self::paramEnvOrDefault($endpoint, self::MANTA_URL_ENV_KEY,
-            self::DEFAULT_MANTA_URL, "endpoint");
-        $this->login = self::paramEnvOrDefault($login, self::MANTA_USER_ENV_KEY, null,
-            "login");
-        $this->keyid = self::paramEnvOrDefault($keyid, self::MANTA_KEY_ID_ENV_KEY, null,
-            "keyid");
+    public function __construct(
+        $endpoint = null,
+        $login = null,
+        $keyid = null,
+        $privateKeyContents = null,
+        $algo = null,
+        $curlopts = null
+    ) {
+        $this->endpoint = self::paramEnvOrDefault(
+            $endpoint,
+            self::MANTA_URL_ENV_KEY,
+            self::DEFAULT_MANTA_URL,
+            "endpoint"
+        );
+
+        $this->login = self::paramEnvOrDefault(
+            $login,
+            self::MANTA_USER_ENV_KEY,
+            null,
+            "login"
+        );
+
+        $this->keyid = self::paramEnvOrDefault(
+            $keyid,
+            self::MANTA_KEY_ID_ENV_KEY,
+            null,
+            "keyid"
+        );
 
         if (!is_null($privateKeyContents) && !empty($privateKeyContents)) {
             $this->privateKeyContents = $privateKeyContents;
         } else {
-            $keyPath = self::paramEnvOrDefault($privateKeyContents, self::MANTA_KEY_PATH_ENV_KEY,
-                getenv('HOME') . self::DEFAULT_MANTA_KEY_PATH_SUFFIX, "priv_key");
-            $contents = file_get_contents($keyPath, false, null, null,
-                self::MAXIMUM_PRIV_KEY_SIZE);
+            $keyPath = self::paramEnvOrDefault(
+                $privateKeyContents,
+                self::MANTA_KEY_PATH_ENV_KEY,
+                getenv('HOME') . self::DEFAULT_MANTA_KEY_PATH_SUFFIX,
+                "priv_key"
+            );
+            $contents = file_get_contents(
+                $keyPath,
+                false,
+                null,
+                null,
+                self::MAXIMUM_PRIV_KEY_SIZE
+            );
             $this->privateKeyContents = $contents;
         }
 
-        $this->algo = self::paramEnvOrDefault($algo, null, self::DEFAULT_HTTP_SIGN_ALGO,
-            "algo");
-        $this->curlopts = self::paramEnvOrDefault($curlopts, null, self::DEFAULT_CURL_OPTS,
-            "curlopts");
+        $this->algo = self::paramEnvOrDefault(
+            $algo,
+            null,
+            self::DEFAULT_HTTP_SIGN_ALGO,
+            "algo"
+        );
+        $this->curlopts = self::paramEnvOrDefault(
+            $curlopts,
+            null,
+            self::DEFAULT_CURL_OPTS,
+            "curlopts"
+        );
     }
 
-    protected static function paramEnvOrDefault($argValue, $envKey,
-                                                $default = null, $argName = null)
-    {
+    protected static function paramEnvOrDefault(
+        $argValue,
+        $envKey,
+        $default = null,
+        $argName = null
+    ) {
         if (!is_null($argValue) && !empty($argValue)) {
             return $argValue;
         }
@@ -111,7 +148,8 @@ class MantaClient
         openssl_sign($data, $sig, $pkeyid, $this->algo);
         $sig = base64_encode($sig);
         $algo = strtolower($this->algo);
-        return "Authorization: Signature keyId=\"/{$this->login}/keys/{$this->keyid}\",algorithm=\"{$algo}\",signature=\"{$sig}\"";
+
+        return sprintf(self::AUTH_HEADER, $this->login, $this->keyid, $algo, $sig);
     }
 
     /**
@@ -123,12 +161,13 @@ class MantaClient
      * @param data          Data to send with PUT or POST requests
      * @param resp_headers  Set to TRUE to return response headers as well as resp data
      *
-     * @return Raw resp data is returned on success; if resp_headers is set, then an array containing 'headers' and 'data' elements is returned
+     * @return Raw resp data is returned on success; if resp_headers is set,
+     *             then an array containing 'headers' and 'data' elements is returned
      * @throws Exception on error
      */
-    protected function execute($method, $url, $headers = array(), $data = NULL, $resp_headers = FALSE)
+    protected function execute($method, $url, $headers = array(), $data = null, $resp_headers = false)
     {
-        $retval = FALSE;
+        $retval = false;
 
         // Prepare authorization headers
         if (!$headers) {
@@ -142,7 +181,7 @@ class MantaClient
             // Set required curl options
             $curlopts = array(
                 CURLOPT_HEADER => $resp_headers,
-                CURLOPT_RETURNTRANSFER => TRUE,
+                CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_URL => "{$this->endpoint}/{$this->login}/{$url}",
                 CURLOPT_CUSTOMREQUEST => $method,
                 CURLOPT_HTTPHEADER => $headers,
@@ -162,14 +201,14 @@ class MantaClient
             try {
                 curl_setopt_array($ch, $curlopts);
                 $resp = curl_exec($ch);
-                if (FALSE !== $resp) {
+                if (false !== $resp) {
                     // Pull info from response and see if we had an error
                     $info = curl_getinfo($ch);
                     if ($info['http_code'] >= 400) {
                         $msg = 'API call failed, no information returned';
 
                         // Try to extract error info from response
-                        $error = json_decode($resp, TRUE);
+                        $error = json_decode($resp, true);
                         if ($error && isset($error['code']) && isset($error['message'])) {
                             $msg = $error['code'] . ': ' . $error['message'];
                         }
@@ -218,7 +257,7 @@ class MantaClient
         $retval = array();
         $items = explode("\n", $data);
         foreach ($items as $item) {
-            $item_decode = json_decode($item, TRUE);
+            $item_decode = json_decode($item, true);
             if (!empty($item_decode)) {
                 $retval[] = $item_decode;
             }
@@ -253,7 +292,7 @@ class MantaClient
      * @return TRUE on success
      * @throws Exception on error
      */
-    public function PutDirectory($directory, $make_parents = FALSE)
+    public function putDirectory($directory, $make_parents = false)
     {
         $headers = array(
             'Content-Type: application/json; type=directory',
@@ -269,7 +308,7 @@ class MantaClient
         } else {
             $result = $this->execute('PUT', "stor/{$directory}", $headers);
         }
-        return TRUE;
+        return true;
     }
 
     /**
@@ -280,13 +319,13 @@ class MantaClient
      * @return Array with 'headers' and 'data' elements where 'data' contains the list of items
      * @throws Exception on error
      */
-    public function ListDirectory($directory = '')
+    public function listDirectory($directory = '')
     {
         $retval = array();
         $headers = array(
             'Content-Type: application/x-json-stream; type=directory',
         );
-        $result = $this->execute('GET', "stor/{$directory}", $headers, NULL, TRUE);
+        $result = $this->execute('GET', "stor/{$directory}", $headers, null, true);
 
         $retval['headers'] = $result['headers'];
         $retval['data'] = $this->parseJSONList($result['data']);
@@ -303,22 +342,22 @@ class MantaClient
      * @return TRUE on success
      * @throws Exception on error
      */
-    public function DeleteDirectory($directory, $recursive = FALSE)
+    public function deleteDirectory($directory, $recursive = false)
     {
         if ($recursive) {
-            $items = $this->ListDirectory($directory);
+            $items = $this->listDirectory($directory);
             foreach ($items['data'] as $item) {
                 if (!empty($item['type'])) {
                     if ('directory' == $item['type']) {
-                        $this->DeleteDirectory("{$directory}/{$item['name']}", TRUE);
+                        $this->deleteDirectory("{$directory}/{$item['name']}", true);
                     } elseif ('object' == $item['type']) {
-                        $this->DeleteObject($item['name'], $directory);
+                        $this->deleteObject($item['name'], $directory);
                     }
                 }
             }
         }
         $result = $this->execute('DELETE', "stor/{$directory}");
-        return TRUE;
+        return true;
     }
 
     /**
@@ -332,12 +371,12 @@ class MantaClient
      * @return TRUE on success
      * @throws Exception on error
      */
-    public function PutObject($data, $object, $directory = NULL, $headers = array())
+    public function putObject($data, $object, $directory = null, $headers = array())
     {
-        $headers[] = 'Content-MD5: ' . base64_encode(md5($data, TRUE));
+        $headers[] = 'Content-MD5: ' . base64_encode(md5($data, true));
         $objpath = !empty($directory) ? "{$directory}/{$object}" : $object;
         $result = $this->execute('PUT', "stor/{$objpath}", $headers, $data);
-        return TRUE;
+        return true;
     }
 
     /**
@@ -349,10 +388,10 @@ class MantaClient
      * @return Array with 'headers' and 'data' elements
      * @throws Exception on error
      */
-    public function GetObject($object, $directory = NULL)
+    public function getObject($object, $directory = null)
     {
         $objpath = !empty($directory) ? "{$directory}/{$object}" : $object;
-        $result = $this->execute('GET', "stor/{$objpath}", NULL, NULL, TRUE);
+        $result = $this->execute('GET', "stor/{$objpath}", null, null, true);
         return $result;
     }
 
@@ -365,7 +404,7 @@ class MantaClient
      * @return TRUE on success
      * @throws Exception on error
      */
-    public function DeleteObject($object, $directory = NULL)
+    public function deleteObject($object, $directory = null)
     {
         $objpath = !empty($directory) ? "{$directory}/{$object}" : $object;
         $result = $this->execute('DELETE', "stor/{$objpath}");
@@ -381,14 +420,14 @@ class MantaClient
      * @return TRUE on success
      * @throws Exception on error
      */
-    public function PutSnapLink($link, $source)
+    public function putSnapLink($link, $source)
     {
         $headers = array(
             'Content-Type: application/json; type=link',
             "Location: /{$this->login}/stor/{$source}",
         );
         $result = $this->execute('PUT', "stor/{$link}", $headers);
-        return TRUE;
+        return true;
     }
 
     /**
@@ -400,13 +439,13 @@ class MantaClient
      * @return Array with 'headers' and 'data' elements
      * @throws Exception on error
      */
-    public function CreateJob($name, $phases)
+    public function createJob($name, $phases)
     {
         $headers = array(
             'Content-Type: application/json',
         );
         $data = json_encode($phases);
-        $result = $this->execute('POST', "jobs", $headers, $data, TRUE);
+        $result = $this->execute('POST', "jobs", $headers, $data, true);
 
         // Extract the job ID if it was returned
         if (!empty($result['headers']['Location'])) {
@@ -425,7 +464,7 @@ class MantaClient
      * @return TRUE on success
      * @throws Exception on error
      */
-    public function AddJobInputs($job_id, $inputs)
+    public function addJobInputs($job_id, $inputs)
     {
         $headers = array(
             'Content-Type: text/plain',
@@ -443,7 +482,7 @@ class MantaClient
      * @return TRUE on success
      * @throws Exception on error
      */
-    public function EndJobInput($job_id)
+    public function endJobInput($job_id)
     {
         $result = $this->execute('POST', "jobs/{$job_id}/live/in/end");
         return $result;
@@ -457,7 +496,7 @@ class MantaClient
      * @return TRUE on success
      * @throws Exception on error
      */
-    public function CancelJob($job_id)
+    public function cancelJob($job_id)
     {
         $result = $this->execute('POST', "jobs/{$job_id}/live/cancel");
         return $result;
@@ -469,10 +508,10 @@ class MantaClient
      * @return Array with 'headers' and 'data' elements where 'data' contains the list of items
      * @throws Exception on error
      */
-    public function ListJobs()
+    public function listJobs()
     {
         $retval = array();
-        $result = $this->execute('GET', "jobs", NULL, NULL, TRUE);
+        $result = $this->execute('GET', "jobs", null, null, true);
 
         $retval['headers'] = $result['headers'];
         $retval['data'] = $this->parseJSONList($result['data']);
@@ -488,9 +527,9 @@ class MantaClient
      * @return Job container object
      * @throws Exception on error
      */
-    public function GetJob($job_id)
+    public function getJob($job_id)
     {
-        $result = $this->execute('GET', "jobs/{$job_id}/live/status", NULL, NULL, TRUE);
+        $result = $this->execute('GET', "jobs/{$job_id}/live/status", null, null, true);
         $retval = json_decode($result['data']);
         return $retval;
     }
@@ -503,10 +542,10 @@ class MantaClient
      * @return Array with 'headers' and 'data' elements where 'data' contains the list of output objects
      * @throws Exception on error
      */
-    public function GetJobOutput($job_id)
+    public function getJobOutput($job_id)
     {
         $retval = array();
-        $result = $this->execute('GET', "jobs/{$job_id}/live/out", NULL, NULL, TRUE);
+        $result = $this->execute('GET', "jobs/{$job_id}/live/out", null, null, true);
 
         $retval['headers'] = $result['headers'];
         $retval['data'] = $this->parseTextList($result['data']);
@@ -522,10 +561,10 @@ class MantaClient
      * @return Array with 'headers' and 'data' elements where 'data' contains the list of input objects
      * @throws Exception on error
      */
-    public function GetJobInput($job_id)
+    public function getJobInput($job_id)
     {
         $retval = array();
-        $result = $this->execute('GET', "jobs/{$job_id}/live/in", NULL, NULL, TRUE);
+        $result = $this->execute('GET', "jobs/{$job_id}/live/in", null, null, true);
 
         $retval['headers'] = $result['headers'];
         $retval['data'] = $this->parseTextList($result['data']);
@@ -541,10 +580,10 @@ class MantaClient
      * @return Array with 'headers' and 'data' elements where 'data' contains the list of error objects
      * @throws Exception on error
      */
-    public function GetJobFailures($job_id)
+    public function getJobFailures($job_id)
     {
         $retval = array();
-        $result = $this->execute('GET', "jobs/{$job_id}/live/fail", NULL, NULL, TRUE);
+        $result = $this->execute('GET', "jobs/{$job_id}/live/fail", null, null, true);
 
         $retval['headers'] = $result['headers'];
         $retval['data'] = $this->parseTextList($result['data']);
@@ -560,45 +599,14 @@ class MantaClient
      * @return Array with 'headers' and 'data' elements where 'data' contains the errors
      * @throws Exception on error
      */
-    public function GetJobErrors($job_id)
+    public function getJobErrors($job_id)
     {
         $retval = array();
-        $result = $this->execute('GET', "jobs/{$job_id}/live/err", NULL, NULL, TRUE);
+        $result = $this->execute('GET', "jobs/{$job_id}/live/err", null, null, true);
 
         $retval['headers'] = $result['headers'];
         $retval['data'] = $this->parseJSONList($result['data']);
 
         return $retval;
-    }
-
-}
-
-/**
- * Manta job phase convenience class for constructing a valid job phase object
- * http://apidocs.joyent.com/manta/api.html#CreateJob
- */
-class MantaJobPhase
-{
-    /**
-     * Construction
-     *
-     * @param phase   Array of Manta job phase options
-     */
-    public function __construct($phase)
-    {
-        $props = array(
-            'type',
-            'assets',
-            'exec',
-            'init',
-            'count',
-            'memory',
-            'disk',
-        );
-        foreach ($props as $prop) {
-            if (isset($phase[$prop])) {
-                $this->{$prop} = $phase[$prop];
-            }
-        }
     }
 }

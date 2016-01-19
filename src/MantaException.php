@@ -1,5 +1,6 @@
 <?php namespace Joyent\Manta;
 
-class MantaException extends \Exception {
+class MantaException extends \Exception
+{
 
 }
