@@ -1,30 +1,40 @@
 <?php namespace Joyent\Manta;
-
-/*! \mainpage
- * TODO: Write me
+/**
+ * This is a simple class library for accessing the Joyent Manta Services via
+ * the public or the private cloud.
  */
+use Exception;
 
 /**
- * @file
+ * Manta client class for interacting with the Manta REST API service endpoint.
  *
- * Provides a simple class library for accessing the Joyent Manta Services via
- * the REST API
- */
-
-/**
- * Manta client class for interaction with the REST API service endpoint
+ * @see More information about Manta https://www.joyent.com/object-storage
+ * @copyright 2016 Joyent Inc.
+ * @license https://www.mozilla.org/en-US/MPL/2.0/
+ * @author Robert Bates
+ * @author Elijah Zupancic <elijah@zupancic.name>
  */
 class MantaClient
 {
+    /** Environment variable for Manta REST endpoint. */
     const MANTA_URL_ENV_KEY = 'MANTA_URL';
+    /** Environment variable for Manta account name. */
     const MANTA_USER_ENV_KEY = 'MANTA_USER';
+    /** Environment variable for private encryption key fingerprint. */
     const MANTA_KEY_ID_ENV_KEY = "MANTA_KEY_ID";
+    /** Environment variable indicating the path to the private key. */
     const MANTA_KEY_PATH_ENV_KEY = 'MANTA_KEY_PATH';
+    /** Default value for Manta REST endpoint. */
     const DEFAULT_MANTA_URL = 'https://us-east.manta.joyent.com:443';
+    /** Default path suffix for private encryption key. */
     const DEFAULT_MANTA_KEY_PATH_SUFFIX = "/.ssh/id_rsa";
+    /** Default encryption algorithm. */
     const DEFAULT_HTTP_SIGN_ALGO = 'RSA-SHA256';
+    /** Default libcurl options. */
     const DEFAULT_CURL_OPTS = array();
+    /** Maximum number of bytes to read from private key file. */
     const MAXIMUM_PRIV_KEY_SIZE = 51200;
+    /** Templated header used for HTTP signature authentication. */
     const AUTH_HEADER = 'Authorization: Signature keyId="/%s/keys/%s",algorithm="%s",signature="%s"';
 
     // Properties
@@ -36,14 +46,18 @@ class MantaClient
     protected $curlopts = null;
 
     /**
-     * Construction
+     * Constructor that will accept explicit parameters for building a Manta
+     * client or default to environment variable settings when set to null.
      *
-     * @param string endpoint            Manta endpoint to use for requests (e.g. https://us-east.manta.joyent.com)
-     * @param string login               Manta login
-     * @param string keyid               Manta keyid
-     * @param string privateKeyContents  Client SSH private key
-     * @param string algo                Algorithm to use for signatures; valid values are RSA-SHA1, RSA-SHA256, DSA-SHA
-     * @param array curlopts             Additional curl options to set for requests
+     * @since 2.0.0
+     * @api
+     *
+     * @param string|null endpoint            Manta endpoint to use for requests (e.g. https://us-east.manta.joyent.com)
+     * @param string|null login               Manta login
+     * @param string|null keyid               Manta keyid
+     * @param string|null privateKeyContents  Client SSH private key
+     * @param string|null algo                Algorithm to use for signatures; valid values are RSA-SHA1, RSA-SHA256, DSA-SHA
+     * @param array|null  curlopts            Additional curl options to set for requests
      */
     public function __construct(
         $endpoint = null,
@@ -107,6 +121,17 @@ class MantaClient
         );
     }
 
+    /**
+     * Parses a given constructor parameter and determines if we should use
+     * the passed value, the associated environment variable's value or the
+     * default value for a given parameter.
+     *
+     * @param  string|array|null $argValue the value from the constructor's parameter
+     * @param  string|null       $envKey   the name of the associated environment variable
+     * @param  string|array|null $default  the default value of the parameter
+     * @param  string|null       $argName  the name of the parameter for debugging
+     * @return string|array                the value chosen based on the inputs
+     */
     protected static function paramEnvOrDefault(
         $argValue,
         $envKey,
@@ -135,11 +160,14 @@ class MantaClient
     }
 
     /**
-     * Internal method to generate the encoded portion of the Authorization request header
+     * Method to generate the encoded portion of the Authorization request
+     * header for signing requests.
      *
-     * @param data      Data to encrypt for signature
+     * @see https://datatracker.ietf.org/doc/draft-cavage-http-signatures/ HTTP Signatures RFC Proposal
      *
-     * @return Fully encoded authorization header
+     * @param string $data Data to encrypt for signature (typically timestamp and other parameters)
+     *
+     * @return string      Fully encoded authorization header
      */
     protected function getAuthorization($data)
     {
@@ -153,20 +181,25 @@ class MantaClient
     }
 
     /**
-     * Internal method to execute REST service call
+     * Method that executes a REST service call using a selectable verb.
      *
-     * @param method        HTTP method (GET, POST, PUT, DELETE)
-     * @param url           Service portion of URL
-     * @param headers       Additional HTTP headers to send with request
-     * @param data          Data to send with PUT or POST requests
-     * @param resp_headers  Set to TRUE to return response headers as well as resp data
-     *
-     * @return Raw resp data is returned on success; if resp_headers is set,
-     *             then an array containing 'headers' and 'data' elements is returned
-     * @throws Exception on error
+     * @param  string  $method       HTTP method (GET, POST, PUT, DELETE)
+     * @param  string  $url          Service portion of URL
+     * @param  array   $headers      Additional HTTP headers to send with request
+     * @param  string  $data         Data to send with PUT or POST requests
+     * @param  boolean $resp_headers Set to TRUE to return response headers as well as resp data
+     * @return array                 Raw resp data is returned on success; if resp_headers is set,
+     *                               then an array containing 'headers' and 'data' elements is returned
+     * @throws Exception             thrown when an unknown exception state happens
+     * @throws MantaException        thrown when we have an IO issue with the network
      */
-    protected function execute($method, $url, $headers = array(), $data = null, $resp_headers = false)
-    {
+    protected function execute(
+        $method,
+        $url,
+        $headers = array(),
+        $data = null,
+        $resp_headers = false
+    ) {
         $retval = false;
 
         // Prepare authorization headers
@@ -250,7 +283,11 @@ class MantaClient
     }
 
     /**
-     * Util method to parse a newline-delimited list of JSON objects into an array
+     * Utility method that parses a newline-delimited list of JSON objects into
+     * an array.
+     *
+     * @param  string $data JSON text
+     * @return array        JSON data as a PHP array
      */
     protected function parseJSONList($data)
     {
@@ -267,7 +304,11 @@ class MantaClient
     }
 
     /**
-     * Util method to parse a newline-delimited list of strings into an array, with trimming
+     * Utility method used to parse a newline-delimited list of strings into an
+     * array with trimming.
+     *
+     * @param  string $data newline-delimited list of strings
+     * @return array        array of strings
      */
     protected function parseTextList($data)
     {
@@ -284,13 +325,16 @@ class MantaClient
     }
 
     /**
-     * http://apidocs.joyent.com/manta/api.html#PutDirectory
+     * Creates a new directory in Manta.
      *
-     * @param directory     Name of directory
-     * @param make_parents  Ensure parent directories exist
+     * @see http://apidocs.joyent.com/manta/api.html#PutDirectory
+     * @since 2.0.0
+     * @api
      *
-     * @return TRUE on success
-     * @throws Exception on error
+     * @param  string  $directory      Name of directory
+     * @param  boolean $make_parents   Ensure parent directories exist
+     *
+     * @return boolean                 TRUE on success
      */
     public function putDirectory($directory, $make_parents = false)
     {
@@ -303,6 +347,7 @@ class MantaClient
             $directory = '';
             foreach ($parents as $parent) {
                 $directory .= $parent . '/';
+                // TODO: Figure out why we aren't using the $result
                 $result = $this->execute('PUT', "stor/{$directory}", $headers);
             }
         } else {
@@ -312,12 +357,15 @@ class MantaClient
     }
 
     /**
-     * http://apidocs.joyent.com/manta/api.html#ListDirectory
      *
-     * @param directory   Name of directory
      *
-     * @return Array with 'headers' and 'data' elements where 'data' contains the list of items
-     * @throws Exception on error
+     * @see http://apidocs.joyent.com/manta/api.html#ListDirectory
+     * @since 2.0.0
+     * @api
+     *
+     * @param string $directory   Name of directory
+     *
+     * @return array with 'headers' and 'data' elements where 'data' contains the list of items
      */
     public function listDirectory($directory = '')
     {
@@ -334,13 +382,15 @@ class MantaClient
     }
 
     /**
-     * http://apidocs.joyent.com/manta/api.html#DeleteDirectory
      *
-     * @param directory   Name of directory
-     * @param recursive   Recurse down directory wiping all children
+     * @see http://apidocs.joyent.com/manta/api.html#DeleteDirectory
+     * @since 2.0.0
+     * @api
      *
-     * @return TRUE on success
-     * @throws Exception on error
+     * @param  string  $directory   Name of directory
+     * @param  boolean $recursive   Recurse down directory wiping all children
+     *
+     * @return TRUE                 on success
      */
     public function deleteDirectory($directory, $recursive = false)
     {
@@ -356,20 +406,24 @@ class MantaClient
                 }
             }
         }
+
+        // TODO: Figure out why we aren't using $result
         $result = $this->execute('DELETE', "stor/{$directory}");
         return true;
     }
 
     /**
-     * http://apidocs.joyent.com/manta/api.html#PutObject
+     *
+     * @see http://apidocs.joyent.com/manta/api.html#PutObject
+     * @since 2.0.0
+     * @api
      *
      * @param data          Data to store
-     * @param object        Name of object
-     * @param directory     Name of directory
-     * @param headers       Additional headers; see documentation for valid values
+     * @param string $object        Name of object
+     * @param string|null $directory     Name of directory
+     * @param array  $headers       Additional headers; see documentation for valid values
      *
-     * @return TRUE on success
-     * @throws Exception on error
+     * @return boolean TRUE on success
      */
     public function putObject($data, $object, $directory = null, $headers = array())
     {
@@ -380,13 +434,15 @@ class MantaClient
     }
 
     /**
-     * http://apidocs.joyent.com/manta/api.html#GetObject
      *
-     * @param object        Name of object
-     * @param directory     Name of directory
+     * @see http://apidocs.joyent.com/manta/api.html#GetObject
+     * @since 2.0.0
+     * @api
      *
-     * @return Array with 'headers' and 'data' elements
-     * @throws Exception on error
+     * @param string $object        Name of object
+     * @param string|null directory     Name of directory
+     *
+     * @return array with 'headers' and 'data' elements
      */
     public function getObject($object, $directory = null)
     {
@@ -396,13 +452,15 @@ class MantaClient
     }
 
     /**
-     * http://apidocs.joyent.com/manta/api.html#DeleteObject
      *
-     * @param object        Name of object
-     * @param directory     Name of directory
+     * @see http://apidocs.joyent.com/manta/api.html#DeleteObject
+     * @since 2.0.0
+     * @api
      *
-     * @return TRUE on success
-     * @throws Exception on error
+     * @param string $object        Name of object
+     * @param string|null $directory     Name of directory
+     *
+     * @return boolean TRUE on success
      */
     public function deleteObject($object, $directory = null)
     {
@@ -412,13 +470,15 @@ class MantaClient
     }
 
     /**
-     * http://apidocs.joyent.com/manta/api.html#PutSnapLink
      *
-     * @param link          Link
-     * @param source        Path to source object
+     * @see http://apidocs.joyent.com/manta/api.html#PutSnapLink
+     * @since 2.0.0
+     * @api
      *
-     * @return TRUE on success
-     * @throws Exception on error
+     * @param string $link          Link
+     * @param string $source        Path to source object
+     *
+     * @return boolean TRUE on success
      */
     public function putSnapLink($link, $source)
     {
@@ -431,13 +491,15 @@ class MantaClient
     }
 
     /**
-     * http://apidocs.joyent.com/manta/api.html#CreateJob
      *
-     * @param name      Name of job
-     * @param phases    Array of MantaJobPhase objects
+     * @see http://apidocs.joyent.com/manta/api.html#CreateJob
+     * @since 2.0.0
+     * @api
      *
-     * @return Array with 'headers' and 'data' elements
-     * @throws Exception on error
+     * @param string $name      Name of job
+     * @param array $phases    Array of MantaJobPhase objects
+     *
+     * @return array with 'headers' and 'data' elements
      */
     public function createJob($name, $phases)
     {
@@ -456,13 +518,14 @@ class MantaClient
     }
 
     /**
-     * http://apidocs.joyent.com/manta/api.html#AddJobInputs
+     * @see http://apidocs.joyent.com/manta/api.html#AddJobInputs
+     * @since 2.0.0
+     * @api
      *
-     * @param job_id    Job id returned by CreateJob
-     * @param inputs    Array of object names to use as inputs
+     * @param string job_id    Job id returned by CreateJob
+     * @param array inputs    Array of object names to use as inputs
      *
-     * @return TRUE on success
-     * @throws Exception on error
+     * @return boolean TRUE on success
      */
     public function addJobInputs($job_id, $inputs)
     {
@@ -475,12 +538,13 @@ class MantaClient
     }
 
     /**
-     * http://apidocs.joyent.com/manta/api.html#EndJobInput
+     * @see http://apidocs.joyent.com/manta/api.html#EndJobInput
+     * @since 2.0.0
+     * @api
      *
-     * @param job_id    Job id returned by CreateJob
+     * @param string $job_id    Job id returned by CreateJob
      *
-     * @return TRUE on success
-     * @throws Exception on error
+     * @return boolean TRUE on success
      */
     public function endJobInput($job_id)
     {
@@ -489,12 +553,13 @@ class MantaClient
     }
 
     /**
-     * http://apidocs.joyent.com/manta/api.html#CancelJob
+     * @see http://apidocs.joyent.com/manta/api.html#CancelJob
+     * @since 2.0.0
+     * @api
      *
-     * @param job_id    Job id returned by CreateJob
+     * @param string $job_id    Job id returned by CreateJob
      *
-     * @return TRUE on success
-     * @throws Exception on error
+     * @return boolean TRUE on success
      */
     public function cancelJob($job_id)
     {
@@ -503,10 +568,11 @@ class MantaClient
     }
 
     /**
-     * http://apidocs.joyent.com/manta/api.html#ListJobs
+     * @see http://apidocs.joyent.com/manta/api.html#ListJobs
+     * @since 2.0.0
+     * @api
      *
-     * @return Array with 'headers' and 'data' elements where 'data' contains the list of items
-     * @throws Exception on error
+     * @return array with 'headers' and 'data' elements where 'data' contains the list of items
      */
     public function listJobs()
     {
@@ -520,12 +586,13 @@ class MantaClient
     }
 
     /**
-     * http://apidocs.joyent.com/manta/api.html#GetJob
+     * @see http://apidocs.joyent.com/manta/api.html#GetJob
+     * @since 2.0.0
+     * @api
      *
-     * @param job_id    Job id returned by CreateJob
+     * @param string $job_id    Job id returned by CreateJob
      *
-     * @return Job container object
-     * @throws Exception on error
+     * @return object Job container object
      */
     public function getJob($job_id)
     {
@@ -535,12 +602,13 @@ class MantaClient
     }
 
     /**
-     * http://apidocs.joyent.com/manta/api.html#GetJobOutput
+     * @see http://apidocs.joyent.com/manta/api.html#GetJobOutput
+     * @since 2.0.0
+     * @api
      *
-     * @param job_id    Job id returned by CreateJob
+     * @param string $job_id    Job id returned by CreateJob
      *
-     * @return Array with 'headers' and 'data' elements where 'data' contains the list of output objects
-     * @throws Exception on error
+     * @return array with 'headers' and 'data' elements where 'data' contains the list of output objects
      */
     public function getJobOutput($job_id)
     {
@@ -554,12 +622,13 @@ class MantaClient
     }
 
     /**
-     * http://apidocs.joyent.com/manta/api.html#GetJobInput
+     * @see http://apidocs.joyent.com/manta/api.html#GetJobInput
+     * @since 2.0.0
+     * @api
      *
-     * @param job_id    Job id returned by CreateJob
+     * @param string $job_id    Job id returned by CreateJob
      *
-     * @return Array with 'headers' and 'data' elements where 'data' contains the list of input objects
-     * @throws Exception on error
+     * @return array with 'headers' and 'data' elements where 'data' contains the list of input objects
      */
     public function getJobInput($job_id)
     {
@@ -573,12 +642,13 @@ class MantaClient
     }
 
     /**
-     * http://apidocs.joyent.com/manta/api.html#GetJobFailures
+     * @see http://apidocs.joyent.com/manta/api.html#GetJobFailures
+     * @since 2.0.0
+     * @api
      *
-     * @param job_id    Job id returned by CreateJob
+     * @param string $job_id    Job id returned by CreateJob
      *
-     * @return Array with 'headers' and 'data' elements where 'data' contains the list of error objects
-     * @throws Exception on error
+     * @return array with 'headers' and 'data' elements where 'data' contains the list of error objects
      */
     public function getJobFailures($job_id)
     {
@@ -592,12 +662,13 @@ class MantaClient
     }
 
     /**
-     * http://apidocs.joyent.com/manta/api.html#GetJobErrors
+     * @see http://apidocs.joyent.com/manta/api.html#GetJobErrors
+     * @since 2.0.0
+     * @api
      *
-     * @param job_id    Job id returned by CreateJob
+     * @param string $job_id    Job id returned by CreateJob
      *
-     * @return Array with 'headers' and 'data' elements where 'data' contains the errors
-     * @throws Exception on error
+     * @return array with 'headers' and 'data' elements where 'data' contains the errors
      */
     public function getJobErrors($job_id)
     {

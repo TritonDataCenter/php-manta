@@ -6,8 +6,15 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 ### Added
  - Added support for composer.
  - Added version number.
+ - Added support for Manta environment variables.
+ - Added unit tests.
+ - Added explicit exception class - MantaException.
  
 ### Changed
  - Moved existing project from bitbucket to github.
  - Changed ownership to Joyent.
  - Changed license to MPLv2.
+ - Broke embedded classes into separate files. 
+ - Reformatted code to comply with PSR2.
+ - Changed documentation generation from Doxygen to phpDocumentor. 
+ 
