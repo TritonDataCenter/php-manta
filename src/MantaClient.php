@@ -204,6 +204,9 @@ class MantaClient
     ) {
         $retval = false;
 
+        // We remove redundant leading slashes, so our URLs look clean
+        $normalized_url = ltrim($url, '/');
+
         // Prepare authorization headers
         if (!$headers) {
             $headers = array();
@@ -217,7 +220,7 @@ class MantaClient
             $curlopts = array(
                 CURLOPT_HEADER => $resp_headers,
                 CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_URL => "{$this->endpoint}/{$this->login}/{$url}",
+                CURLOPT_URL => "{$this->endpoint}/{$normalized_url}",
                 CURLOPT_CUSTOMREQUEST => $method,
                 CURLOPT_HTTPHEADER => $headers,
             );
@@ -350,10 +353,10 @@ class MantaClient
             foreach ($parents as $parent) {
                 $directory .= $parent . '/';
                 // TODO: Figure out why we aren't using the $result
-                $result = $this->execute('PUT', "stor/{$directory}", $headers);
+                $result = $this->execute('PUT', "{$directory}", $headers);
             }
         } else {
-            $result = $this->execute('PUT', "stor/{$directory}", $headers);
+            $result = $this->execute('PUT', "{$directory}", $headers);
         }
         return true;
     }
@@ -375,7 +378,7 @@ class MantaClient
         $headers = array(
             'Content-Type: application/x-json-stream; type=directory',
         );
-        $result = $this->execute('GET', "stor/{$directory}", $headers, null, true);
+        $result = $this->execute('GET', "{$directory}", $headers, null, true);
 
         $retval['headers'] = $result['headers'];
         $retval['data'] = $this->parseJSONList($result['data']);
@@ -410,7 +413,7 @@ class MantaClient
         }
 
         // TODO: Figure out why we aren't using $result
-        $result = $this->execute('DELETE', "stor/{$directory}");
+        $result = $this->execute('DELETE', "{$directory}");
         return true;
     }
 
@@ -427,11 +430,10 @@ class MantaClient
      *
      * @return boolean TRUE on success
      */
-    public function putObject($data, $object, $directory = null, $headers = array())
+    public function putObject($data, $object, $headers = array())
     {
         $headers[] = 'Content-MD5: ' . base64_encode(md5($data, true));
-        $objpath = !empty($directory) ? "{$directory}/{$object}" : $object;
-        $result = $this->execute('PUT', "stor/{$objpath}", $headers, $data);
+        $result = $this->execute('PUT', $object, $headers, $data);
         return true;
     }
 
@@ -446,10 +448,9 @@ class MantaClient
      *
      * @return array with 'headers' and 'data' elements
      */
-    public function getObject($object, $directory = null)
+    public function getObject($object)
     {
-        $objpath = !empty($directory) ? "{$directory}/{$object}" : $object;
-        $result = $this->execute('GET', "stor/{$objpath}", null, null, true);
+        $result = $this->execute('GET', $object, null, null, true);
         return $result;
     }
 
@@ -467,7 +468,7 @@ class MantaClient
     public function deleteObject($object, $directory = null)
     {
         $objpath = !empty($directory) ? "{$directory}/{$object}" : $object;
-        $result = $this->execute('DELETE', "stor/{$objpath}");
+        $result = $this->execute('DELETE', "{$objpath}");
         return $result;
     }
 
@@ -486,9 +487,9 @@ class MantaClient
     {
         $headers = array(
             'Content-Type: application/json; type=link',
-            "Location: /{$this->login}/stor/{$source}",
+            "Location: {$source}",
         );
-        $result = $this->execute('PUT', "stor/{$link}", $headers);
+        $result = $this->execute('PUT', "{$link}", $headers);
         return true;
     }
 

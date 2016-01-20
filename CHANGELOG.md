@@ -17,4 +17,4 @@ This project adheres to [Semantic Versioning](http://semver.org/).
  - Broke embedded classes into separate files. 
  - Reformatted code to comply with PSR2.
  - Changed documentation generation from Doxygen to phpDocumentor. 
- 
+ - Manta paths are now specified absolutely and not relative to /account/stor.
