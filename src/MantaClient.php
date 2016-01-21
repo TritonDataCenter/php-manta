@@ -4,8 +4,11 @@
  * the public or the private cloud.
  */
 
-/** We import Exception explicitly because if we don't it confuses phpDocumentor. */
-use \Exception;
+use Psr\Http\Message\RequestInterface;
+use GuzzleHttp\HandlerStack;
+use GuzzleHttp\Handler\CurlHandler;
+use GuzzleHttp\Client;
+use GuzzleHttp\Middleware;
 
 /**
  * Manta client class for interacting with the Manta REST API service endpoint.
@@ -33,11 +36,12 @@ class MantaClient
     /** Default encryption algorithm. */
     const DEFAULT_HTTP_SIGN_ALGO = 'RSA-SHA256';
     /** Default libcurl options. */
-    const DEFAULT_CURL_OPTS = array();
+    const DEFAULT_CURL_OPTS = array(CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1,
+        CURLOPT_SSL_VERIFYPEER, 0);
     /** Maximum number of bytes to read from private key file. */
     const MAXIMUM_PRIV_KEY_SIZE = 51200;
     /** Templated header used for HTTP signature authentication. */
-    const AUTH_HEADER = 'Authorization: Signature keyId="/%s/keys/%s",algorithm="%s",signature="%s"';
+    const AUTH_HEADER = 'Signature keyId="/%s/keys/%s",algorithm="%s",signature="%s"';
 
     // Properties
     protected $endpoint = null;
@@ -167,15 +171,16 @@ class MantaClient
      *
      * @see https://datatracker.ietf.org/doc/draft-cavage-http-signatures/ HTTP Signatures RFC Proposal
      *
-     * @param string $data Data to encrypt for signature (typically timestamp and other parameters)
+     * @param string $timestamp Data to encrypt for signature (typically timestamp and other parameters)
      *
      * @return string      Fully encoded authorization header
      */
-    protected function getAuthorization($data)
+    protected function getAuthorization($timestamp)
     {
         $pkeyid = openssl_get_privatekey($this->privateKeyContents);
         $sig = '';
-        openssl_sign($data, $sig, $pkeyid, $this->algo);
+        $dateString = sprintf('Date: %s', $timestamp);
+        openssl_sign($dateString , $sig, $pkeyid, $this->algo);
         $sig = base64_encode($sig);
         $algo = strtolower($this->algo);
 
@@ -186,32 +191,63 @@ class MantaClient
      * Method that executes a REST service call using a selectable verb.
      *
      * @param  string  $method       HTTP method (GET, POST, PUT, DELETE)
-     * @param  string  $url          Service portion of URL
+     * @param  string  $path          Service portion of URL
      * @param  array   $headers      Additional HTTP headers to send with request
      * @param  string  $data         Data to send with PUT or POST requests
      * @param  boolean $resp_headers Set to TRUE to return response headers as well as resp data
      * @return array                 Raw resp data is returned on success; if resp_headers is set,
      *                               then an array containing 'headers' and 'data' elements is returned
-     * @throws Exception             thrown when an unknown exception state happens
      * @throws MantaException        thrown when we have an IO issue with the network
      */
     protected function execute(
         $method,
-        $url,
+        $path,
         $headers = array(),
         $data = null,
         $resp_headers = false
     ) {
         $retval = false;
 
+        // Make sure that the path is in valid UTF-8
+        mb_check_encoding($path, 'UTF-8');
+
         // We remove redundant leading slashes, so our URLs look clean
-        $normalized_url = ltrim($url, '/');
+        $withLeadingSlash = ltrim(str_replace('//', '/', $path), '/');
+        $encodedPath = rawurlencode($withLeadingSlash);
+        // We unencode slashes because they are indicating directory separators
+        $normalizedUrl = str_replace('%2F', '/', $encodedPath);
 
         // Prepare authorization headers
         if (!$headers) {
             $headers = array();
         }
-        $headers[] = $this->getAuthorization($headers[] = 'date: ' . gmdate('r'));
+        $headers[] = $this->getAuthorization($headers[] = 'Date: ' . gmdate('r'));
+
+        $stack = new HandlerStack();
+        $stack->setHandler(new CurlHandler());
+
+        $stack->push(Middleware::mapRequest(function (RequestInterface $request) {
+            $timestamp = gmdate('r');
+            $authorization = $this->getAuthorization($timestamp);
+
+            return $request->withHeader('Date', $timestamp)
+                           ->withHeader('Authorization', $authorization);
+        }));
+
+        $params = [
+            'base_uri' => $this->endpoint,
+            'timeout'  => 2,
+            'handler' => $stack
+        ];
+
+        $client = new Client($params);
+
+        $options = [
+            'body'    => $data,
+            'proxy'   => 'tcp://127.0.0.1:8888',
+            'verify'  => false
+        ];
+        $res = $client->request($method, $path, $options);
 
         // Create a new cURL resource
         $ch = curl_init();
@@ -220,7 +256,7 @@ class MantaClient
             $curlopts = array(
                 CURLOPT_HEADER => $resp_headers,
                 CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_URL => "{$this->endpoint}/{$normalized_url}",
+                CURLOPT_URL => "{$this->endpoint}/{$normalizedUrl}",
                 CURLOPT_CUSTOMREQUEST => $method,
                 CURLOPT_HTTPHEADER => $headers,
             );
@@ -272,14 +308,9 @@ class MantaClient
                 } else {
                     throw new MantaException(curl_error($ch), curl_errno($ch));
                 }
-            } catch (Exception $e) {
-                // Close and cleanup here since 'finally' blocks aren't available until PHP 5.5
+            } finally {
                 curl_close($ch);
-                throw $e;
             }
-
-            // Close and cleanup
-            curl_close($ch);
         } else {
             throw new MantaException('Unable to initialize curl session');
         }
@@ -329,6 +360,12 @@ class MantaClient
         return $retval;
     }
 
+    public function exists($path)
+    {
+        $result = $this->execute('HEAD', $path, array(CURLOPT_CONNECTTIMEOUT, true), null, true);
+        return $result;
+    }
+
     /**
      * Creates a new directory in Manta.
      *
@@ -353,10 +390,10 @@ class MantaClient
             foreach ($parents as $parent) {
                 $directory .= $parent . '/';
                 // TODO: Figure out why we aren't using the $result
-                $result = $this->execute('PUT', "{$directory}", $headers);
+                $result = $this->execute('PUT', $directory, $headers);
             }
         } else {
-            $result = $this->execute('PUT', "{$directory}", $headers);
+            $result = $this->execute('PUT', $directory, $headers);
         }
         return true;
     }
