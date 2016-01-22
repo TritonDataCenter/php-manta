@@ -4,6 +4,7 @@
  * the public or the private cloud.
  */
 
+use GuzzleHttp\Psr7\Response;
 use Psr\Http\Message\RequestInterface;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Handler\CurlHandler;
@@ -179,7 +180,7 @@ class MantaClient
     {
         $pkeyid = openssl_get_privatekey($this->privateKeyContents);
         $sig = '';
-        $dateString = sprintf('Date: %s', $timestamp);
+        $dateString = sprintf('date: %s', $timestamp);
         openssl_sign($dateString , $sig, $pkeyid, $this->algo);
         $sig = base64_encode($sig);
         $algo = strtolower($this->algo);
@@ -190,24 +191,22 @@ class MantaClient
     /**
      * Method that executes a REST service call using a selectable verb.
      *
-     * @param  string  $method       HTTP method (GET, POST, PUT, DELETE)
-     * @param  string  $path          Service portion of URL
-     * @param  array   $headers      Additional HTTP headers to send with request
-     * @param  string  $data         Data to send with PUT or POST requests
-     * @param  boolean $resp_headers Set to TRUE to return response headers as well as resp data
-     * @return array                 Raw resp data is returned on success; if resp_headers is set,
-     *                               then an array containing 'headers' and 'data' elements is returned
-     * @throws MantaException        thrown when we have an IO issue with the network
+     * @param  string   $method              HTTP method (GET, POST, PUT, DELETE)
+     * @param  string   $path                Service portion of URL
+     * @param  array    $headers             Additional HTTP headers to send with request
+     * @param  string   $data                Data to send with PUT or POST requests
+     * @param  boolean  $throwErrorOnFailure When set to true, HTTP response codes greater
+     *                                       than 299 will trigger a MantaException
+     * @return Response $result              HTTP response object
+     * @throws MantaException                thrown when we have an IO issue with the network
      */
     protected function execute(
         $method,
         $path,
         $headers = array(),
         $data = null,
-        $resp_headers = false
+        $throwErrorOnFailure = true
     ) {
-        $retval = false;
-
         // Make sure that the path is in valid UTF-8
         mb_check_encoding($path, 'UTF-8');
 
@@ -216,12 +215,6 @@ class MantaClient
         $encodedPath = rawurlencode($withLeadingSlash);
         // We unencode slashes because they are indicating directory separators
         $normalizedUrl = str_replace('%2F', '/', $encodedPath);
-
-        // Prepare authorization headers
-        if (!$headers) {
-            $headers = array();
-        }
-        $headers[] = $this->getAuthorization($headers[] = 'Date: ' . gmdate('r'));
 
         $stack = new HandlerStack();
         $stack->setHandler(new CurlHandler());
@@ -235,87 +228,43 @@ class MantaClient
         }));
 
         $params = [
+            'headers'  => $headers,
             'base_uri' => $this->endpoint,
-            'timeout'  => 2,
-            'handler' => $stack
+            'timeout'  => 200,
+            'handler'  => $stack
         ];
 
         $client = new Client($params);
 
         $options = [
-            'body'    => $data,
             'proxy'   => 'tcp://127.0.0.1:8888',
             'verify'  => false
         ];
-        $res = $client->request($method, $path, $options);
 
-        // Create a new cURL resource
-        $ch = curl_init();
-        if ($ch) {
-            // Set required curl options
-            $curlopts = array(
-                CURLOPT_HEADER => $resp_headers,
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_URL => "{$this->endpoint}/{$normalizedUrl}",
-                CURLOPT_CUSTOMREQUEST => $method,
-                CURLOPT_HTTPHEADER => $headers,
-            );
-            if ($data) {
-                $curlopts[CURLOPT_POSTFIELDS] = $data;
-            }
-
-            // Merge extra options, preventing overwrite of required options
-            foreach ($this->curlopts as $opt_key => $opt_value) {
-                if (!isset($curlopts[$opt_key])) {
-                    $curlopts[$opt_key] = $opt_value;
-                }
-            }
-
-            // Execute the request and cleanup
-            try {
-                curl_setopt_array($ch, $curlopts);
-                $resp = curl_exec($ch);
-                if (false !== $resp) {
-                    // Pull info from response and see if we had an error
-                    $info = curl_getinfo($ch);
-                    if ($info['http_code'] >= 400) {
-                        $msg = 'API call failed, no information returned';
-
-                        // Try to extract error info from response
-                        $error = json_decode($resp, true);
-                        if ($error && isset($error['code']) && isset($error['message'])) {
-                            $msg = $error['code'] . ': ' . $error['message'];
-                        }
-
-                        throw new MantaException($msg, $info['http_code']);
-                    } else {
-                        if (!$resp_headers) {
-                            $retval = $resp;
-                        } else {
-                            // Split out response headers into name => value array
-                            list($headers, $data) = explode("\r\n\r\n", $resp, 2);
-                            $headers = explode("\r\n", $headers);
-                            foreach ($headers as $header) {
-                                if ('HTTP' == substr($header, 0, 4)) {
-                                    continue;
-                                }
-                                list($name, $value) = explode(':', $header, 2);
-                                $retval['headers'][trim($name)] = trim($value);
-                            }
-                            $retval['data'] = $data;
-                        }
-                    }
-                } else {
-                    throw new MantaException(curl_error($ch), curl_errno($ch));
-                }
-            } finally {
-                curl_close($ch);
-            }
-        } else {
-            throw new MantaException('Unable to initialize curl session');
+        if (!is_null($data)) {
+            $options['body'] = $data;
         }
 
-        return $retval;
+        $res = $client->request($method, $path, $options);
+
+        if ($throwErrorOnFailure && $res->getStatusCode() > 299) {
+            $jsonDetail = null;
+
+            try
+            {
+                $jsonDetail = (string)$res->getBody();
+            } catch (\Exception $e)
+            {
+                // Do nothing. If we can't get the details, then we just pass null
+            }
+
+            throw new MantaException(
+                $res->getReasonPhrase(),
+                $res->getStatusCode(),
+                $jsonDetail);
+        }
+
+        return $res;
     }
 
     /**
@@ -362,8 +311,8 @@ class MantaClient
 
     public function exists($path)
     {
-        $result = $this->execute('HEAD', $path, array(CURLOPT_CONNECTTIMEOUT, true), null, true);
-        return $result;
+        $result = $this->execute('HEAD', $path, array(), null, false);
+        return $result->getStatusCode() == 200;
     }
 
     /**
@@ -381,7 +330,7 @@ class MantaClient
     public function putDirectory($directory, $make_parents = false)
     {
         $headers = array(
-            'Content-Type: application/json; type=directory',
+            'Content-Type' => 'application/json; type=directory'
         );
 
         if ($make_parents) {
@@ -409,18 +358,27 @@ class MantaClient
      *
      * @return array with 'headers' and 'data' elements where 'data' contains the list of items
      */
-    public function listDirectory($directory = '')
+    public function listDirectory($directory)
     {
-        $retval = array();
         $headers = array(
-            'Content-Type: application/x-json-stream; type=directory',
+            'Content-Type' => 'application/x-json-stream; type=directory'
         );
-        $result = $this->execute('GET', "{$directory}", $headers, null, true);
+        $response = $this->execute('GET', $directory, $headers, null, true);
+        $body = $response->getBody();
 
-        $retval['headers'] = $result['headers'];
-        $retval['data'] = $this->parseJSONList($result['data']);
+        try
+        {
+            $responseJson = (string)$body;
+            $result = array (
+                'headers' => $response->getHeaders(),
+                'data'    => $this->parseJSONList($responseJson)
+            );
 
-        return $retval;
+            return $result;
+        } finally
+        {
+            $body->close();
+        }
     }
 
     /**
@@ -485,10 +443,44 @@ class MantaClient
      *
      * @return array with 'headers' and 'data' elements
      */
-    public function getObject($object)
+    public function getObjectAsString($object)
     {
-        $result = $this->execute('GET', $object, null, null, true);
-        return $result;
+        $response = $this->execute('GET', $object, null, null, true);
+        $body = $response->getBody();
+
+        try
+        {
+            $result = array(
+                'headers' => $response->getHeaders(),
+                'data' => (string)$body
+            );
+
+            return $result;
+        } finally
+        {
+            $body->close();
+        }
+    }
+
+    /**
+     *
+     * @see http://apidocs.joyent.com/manta/api.html#GetObject
+     * @since 2.0.0
+     * @api
+     *
+     * @param string $object        Name of object
+     * @param string|null directory     Name of directory
+     *
+     * @return array with 'headers' and 'data' elements
+     */
+    public function getObjectAsStream($object)
+    {
+        $response = $this->execute('GET', $object, null, null, true);
+
+        return array(
+            'headers' => $response->getHeaders(),
+            'stream' => $response->getBody()
+        );
     }
 
     /**
@@ -523,8 +515,8 @@ class MantaClient
     public function putSnapLink($link, $source)
     {
         $headers = array(
-            'Content-Type: application/json; type=link',
-            "Location: {$source}",
+            'Content-Type' => 'application/json; type=link',
+            'Location'     => $source,
         );
         $result = $this->execute('PUT', "{$link}", $headers);
         return true;
@@ -544,7 +536,7 @@ class MantaClient
     public function createJob($name, $phases)
     {
         $headers = array(
-            'Content-Type: application/json',
+            'Content-Type' => 'application/json'
         );
         $data = json_encode($phases);
         $result = $this->execute('POST', "jobs", $headers, $data, true);
@@ -570,7 +562,7 @@ class MantaClient
     public function addJobInputs($job_id, $inputs)
     {
         $headers = array(
-            'Content-Type: text/plain',
+            'Content-Type' => 'text/plain'
         );
         $data = implode("\n", $inputs);
         $result = $this->execute('POST', "jobs/{$job_id}/live/in", $headers, $data);
