@@ -79,13 +79,13 @@ class MantaClientIT extends PHPUnit_Framework_TestCase
         self::$instance->putDirectory($dirPath);
     }
 
-    /** @test if we can put an object and then get it */
-    public function canPutAnObjectAndGetIt()
+    /** @test if we can put an object from a string and then get it */
+    public function canPutObjectFromStringAnAndGetIt()
     {
         $data = "Plain-text test data";
         $objectPath = sprintf('%s/%s.txt', self::$testDir, uniqid());
-        $wasAdded = self::$instance->putObject($data, $objectPath);
-        $this->assertTrue($wasAdded, "Object not inserted: {$objectPath}");
+        $putResponse = self::$instance->putObject($data, $objectPath);
+        $this->assertArrayHasKey('headers', $putResponse, "Object not inserted: {$objectPath}");
 
         $objectResponse = self::$instance->getObjectAsString($objectPath);
         $this->assertArrayHasKey('data', $objectResponse);
@@ -93,13 +93,54 @@ class MantaClientIT extends PHPUnit_Framework_TestCase
         $this->assertEquals($data, $objectContents, "Remote object data is not equal to data stored");
     }
 
+    /** @test if we can put an object from a fopen resource and then get it */
+    public function canPutObjectFromFOpenAnAndGetIt()
+    {
+        $filePath = realpath(dirname(__FILE__));
+        $file = fopen("{$filePath}/../data/binary_file", 'r');
+
+        try
+        {
+            $objectPath = sprintf('%s/%s.txt', self::$testDir, uniqid());
+            $putResponse = self::$instance->putObject($file, $objectPath);
+            $this->assertArrayHasKey('headers', $putResponse, "Object not inserted: {$objectPath}");
+
+            $objectResponse = self::$instance->getObjectAsString($objectPath);
+            $this->assertArrayHasKey('data', $objectResponse);
+            $objectContents = $objectResponse['data'];
+            $actualContents = file_get_contents("{$filePath}/../data/binary_file", 'r');
+            $this->assertEquals($actualContents, $objectContents, "Remote object data is not equal to data stored");
+        } finally
+        {
+            if (is_resource($file))
+            {
+                fclose($file);
+            }
+        }
+    }
+
+    /** @test if we can put an object from a stream and then get it */
+    public function canPutObjectFromStreamAnAndGetIt()
+    {
+        $actualObject = "I'm a stream...";
+        $stream = GuzzleHttp\Psr7\stream_for($actualObject);
+        $objectPath = sprintf('%s/%s.txt', self::$testDir, uniqid());
+        $putResponse = self::$instance->putObject($stream, $objectPath);
+        $this->assertArrayHasKey('headers', $putResponse, "Object not inserted: {$objectPath}");
+
+        $objectResponse = self::$instance->getObjectAsString($objectPath);
+        $this->assertArrayHasKey('data', $objectResponse);
+        $objectContents = $objectResponse['data'];
+        $this->assertEquals($actualObject, $objectContents, "Remote object data is not equal to data stored");
+    }
+
     /** @test if we can overwrite an existing object */
     public function canOverwriteAnObject()
     {
         $data = "Plain-text test data";
         $objectPath = sprintf("%s/%s.txt", self::$testDir, uniqid());
-        $wasAdded = self::$instance->putObject($data, $objectPath);
-        $this->assertTrue($wasAdded, "Object not inserted: {$objectPath}");
+        $putResponse = self::$instance->putObject($data, $objectPath);
+        $this->assertArrayHasKey('headers', $putResponse, "Object not inserted: {$objectPath}");
 
         $objectResponse = self::$instance->getObjectAsString($objectPath);
         $this->assertArrayHasKey('data', $objectResponse);
@@ -108,16 +149,17 @@ class MantaClientIT extends PHPUnit_Framework_TestCase
 
         $updatedData = "Plain-text test data - updated";
         $wasUpdated = self::$instance->putObject($updatedData, $objectPath);
-        $this->assertTrue($wasUpdated, "Object not updated: {$objectPath}");
+        $this->assertArrayHasKey('headers', $wasUpdated, "Object not updated: {$objectPath}");
     }
 
     /** @test if we can properly write utf-8 data as read from a file into memory */
     public function canWriteUTF8FromFileInMemory()
     {
-        $data = file_get_contents('../data/utf-8_file_contents.txt');
+        $filePath = realpath(dirname(__FILE__));
+        $data = file_get_contents("{$filePath}/../data/utf-8_file_contents.txt");
         $objectPath = sprintf("%s/%s.txt", self::$testDir, uniqid());
-        $wasAdded = self::$instance->putObject($data, $objectPath);
-        $this->assertTrue($wasAdded, "Object not inserted: {$objectPath}");
+        $putResponse = self::$instance->putObject($data, $objectPath);
+        $this->assertArrayHasKey('headers', $putResponse, "Object not inserted: {$objectPath}");
 
         $objectResponse = self::$instance->getObjectAsString($objectPath);
         $this->assertArrayHasKey('data', $objectResponse);
@@ -129,10 +171,11 @@ class MantaClientIT extends PHPUnit_Framework_TestCase
     public function canWriteToUTF8Filename()
     {
         $data = "Plain-text test data";
-        $filename = rtrim(file_get_contents('../data/utf-8_file_contents.txt'), "\n");
+        $filePath = realpath(dirname(__FILE__));
+        $filename = rtrim(file_get_contents("{$filePath}/../data/utf-8_file_contents.txt"), "\n");
         $objectPath = sprintf("%s/%s.txt", self::$testDir, $filename);
-        $wasAdded = self::$instance->putObject($data, $objectPath);
-        $this->assertTrue($wasAdded, "Object not inserted: {$objectPath}");
+        $putResponse = self::$instance->putObject($data, $objectPath);
+        $this->assertArrayHasKey('headers', $putResponse, "Object not inserted: {$objectPath}");
 
         $objectResponse = self::$instance->getObjectAsString($objectPath);
         $this->assertArrayHasKey('data', $objectResponse);

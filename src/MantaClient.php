@@ -194,7 +194,8 @@ class MantaClient
      * @param  string   $method              HTTP method (GET, POST, PUT, DELETE)
      * @param  string   $path                Service portion of URL
      * @param  array    $headers             Additional HTTP headers to send with request
-     * @param  string   $data                Data to send with PUT or POST requests
+     * @param  string|resource|StreamInterface
+     *                  $data                Data to send with PUT or POST requests
      * @param  boolean  $throwErrorOnFailure When set to true, HTTP response codes greater
      *                                       than 299 will trigger a MantaException
      * @return Response $result              HTTP response object
@@ -212,9 +213,6 @@ class MantaClient
 
         // We remove redundant leading slashes, so our URLs look clean
         $withLeadingSlash = ltrim(str_replace('//', '/', $path), '/');
-        $encodedPath = rawurlencode($withLeadingSlash);
-        // We unencode slashes because they are indicating directory separators
-        $normalizedUrl = str_replace('%2F', '/', $encodedPath);
 
         $stack = new HandlerStack();
         $stack->setHandler(new CurlHandler());
@@ -231,6 +229,7 @@ class MantaClient
             'headers'  => $headers,
             'base_uri' => $this->endpoint,
             'timeout'  => 200,
+            'version'  => '1.1',
             'handler'  => $stack
         ];
 
@@ -245,7 +244,7 @@ class MantaClient
             $options['body'] = $data;
         }
 
-        $res = $client->request($method, $path, $options);
+        $res = $client->request($method, $withLeadingSlash, $options);
 
         if ($throwErrorOnFailure && $res->getStatusCode() > 299) {
             $jsonDetail = null;
@@ -338,13 +337,15 @@ class MantaClient
             $directory = '';
             foreach ($parents as $parent) {
                 $directory .= $parent . '/';
-                // TODO: Figure out why we aren't using the $result
                 $result = $this->execute('PUT', $directory, $headers);
             }
         } else {
             $result = $this->execute('PUT', $directory, $headers);
         }
-        return true;
+
+        return array(
+            'headers' => $result->getHeaders()
+        );
     }
 
     /**
@@ -418,18 +419,24 @@ class MantaClient
      * @since 2.0.0
      * @api
      *
-     * @param data          Data to store
-     * @param string $object        Name of object
-     * @param string|null $directory     Name of directory
-     * @param array  $headers       Additional headers; see documentation for valid values
+     * @param data            Data to store
+     * @param string $object  Name of object
+     * @param array  $headers Additional headers; see documentation for valid values
      *
-     * @return boolean TRUE on success
+     * @return array          Array containing details of the PUT response
      */
     public function putObject($data, $object, $headers = array())
     {
-        $headers[] = 'Content-MD5: ' . base64_encode(md5($data, true));
-        $result = $this->execute('PUT', $object, $headers, $data);
-        return true;
+        if (is_string($data)) {
+            $headers['Content-MD5'] = base64_encode(md5($data, true));
+        }
+        // TODO: Figure out how to performantly handle MD5's for streams
+
+        $response = $this->execute('PUT', $object, $headers, $data);
+
+        return array(
+            'headers' => $response->getHeaders()
+        );
     }
 
     /**
