@@ -449,7 +449,7 @@ class MantaClient
      * @param  string  $directory   Name of directory
      * @param  boolean $recursive   Recurse down directory wiping all children
      *
-     * @return array                   array of request header values
+     * @return array                array of request header values
      */
     public function deleteDirectory($directory, $recursive = false)
     {
