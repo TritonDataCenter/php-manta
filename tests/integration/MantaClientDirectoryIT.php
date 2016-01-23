@@ -116,4 +116,79 @@ class MantaClientDirectoryIT extends PHPUnit_Framework_TestCase
             "Wrong content type for directory"
         );
     }
+
+    /** @test if we can delete a single directory */
+    public function canDeleteSingleDirectory()
+    {
+        $dirPath = sprintf('%s/%s', self::$testDir, uniqid());
+
+        $this->assertFalse(
+            self::$instance->exists($dirPath),
+            "Directory path should not already exist: {$dirPath}"
+        );
+
+        self::$instance->putDirectory($dirPath);
+
+        $this->assertTrue(
+            self::$instance->exists($dirPath),
+            "Directory path should exist: {$dirPath}"
+        );
+
+        $dir = self::$instance->getObjectAsStream($dirPath);
+        $this->assertEquals(
+            $dir['headers']['Content-Type'][0],
+            'application/x-json-stream; type=directory',
+            "Wrong content type for directory"
+        );
+
+        self::$instance->deleteDirectory($dirPath, false);
+
+        $this->assertFalse(
+            self::$instance->exists($dirPath),
+            "Directory path shouldn't exist: {$dirPath}"
+        );
+    }
+
+    /** @test if we can delete a multiple directories */
+    public function canDeleteMultipleDirectories()
+    {
+        $basePath = sprintf(
+            '%s/%s',
+            self::$testDir,
+            uniqid()
+        );
+
+
+        $dirPath = sprintf(
+            '%s/%s/%s/%s',
+            $basePath,
+            uniqid(),
+            uniqid(),
+            uniqid()
+        );
+
+        $this->assertFalse(
+            self::$instance->exists($dirPath),
+            "Directory path should not already exist: {$dirPath}"
+        );
+
+        self::$instance->putDirectory($dirPath, true);
+
+        $this->assertTrue(
+            self::$instance->exists($dirPath),
+            "Directory path should exist: {$dirPath}"
+        );
+
+        $response = self::$instance->deleteDirectory($basePath, true);
+
+        $this->assertEquals(
+            4,
+            count($response['all_headers']),
+            'The expected number of response headers were not found');
+
+        $this->assertFalse(
+            self::$instance->exists($basePath),
+            "Directory path shouldn't exist: {$basePath}"
+        );
+    }
 }

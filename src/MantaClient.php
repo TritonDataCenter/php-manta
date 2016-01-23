@@ -324,7 +324,7 @@ class MantaClient
      * @param  string  $directory      Name of directory
      * @param  boolean $make_parents   Ensure parent directories exist
      *
-     * @return boolean                 TRUE on success
+     * @return array                   array of request header values
      */
     public function putDirectory($directory, $make_parents = false)
     {
@@ -405,7 +405,7 @@ class MantaClient
     }
 
     /**
-     *
+     * Lists the contents of a directory on the remote Manta filesystem.
      *
      * @see http://apidocs.joyent.com/manta/api.html#ListDirectory
      * @since 2.0.0
@@ -439,6 +439,8 @@ class MantaClient
     }
 
     /**
+     * Deletes a single directory or multiple directories from the remote
+     * Manta filesystem.
      *
      * @see http://apidocs.joyent.com/manta/api.html#DeleteDirectory
      * @since 2.0.0
@@ -447,26 +449,51 @@ class MantaClient
      * @param  string  $directory   Name of directory
      * @param  boolean $recursive   Recurse down directory wiping all children
      *
-     * @return TRUE                 on success
+     * @return array                   array of request header values
      */
     public function deleteDirectory($directory, $recursive = false)
     {
+        $results = array();
+
+
         if ($recursive) {
             $items = $this->listDirectory($directory);
+
+            $results['all_headers'] = array();
+
             foreach ($items['data'] as $item) {
                 if (!empty($item['type'])) {
+                    /** @var Response|null $response */
+                    $response = null;
+
                     if ('directory' == $item['type']) {
-                        $this->deleteDirectory("{$directory}/{$item['name']}", true);
+                        $response = $this->deleteDirectory("{$directory}/{$item['name']}", true);
                     } elseif ('object' == $item['type']) {
-                        $this->deleteObject($item['name'], $directory);
+                        $response = $this->deleteObject($item['name'], $directory);
+                    }
+
+                    if (is_null($response)) {
+                        continue;
+                    }
+
+                    if (array_key_exists('headers', $response)) {
+                        $results['all_headers'][] = $response['headers'];
+                    } else if (array_key_exists('all_headers', $response)) {
+                        $results['all_headers'] = array_merge($results['all_headers'], $response['all_headers']);
                     }
                 }
             }
         }
 
-        // TODO: Figure out why we aren't using $result
-        $result = $this->execute('DELETE', "{$directory}");
-        return true;
+        $response = $this->execute('DELETE', $directory);
+
+        if (array_key_exists('all_headers', $results)) {
+            $results['all_headers'][] = $response->getHeaders();
+        } else {
+            $results['headers'] = $response->getHeaders();
+        }
+
+        return $results;
     }
 
     /**
