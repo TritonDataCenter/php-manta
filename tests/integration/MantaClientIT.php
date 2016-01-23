@@ -30,55 +30,6 @@ class MantaClientIT extends PHPUnit_Framework_TestCase
         }
     }
 
-    /** @test if we can add a single directory */
-    public function canCreateSingleDirectory()
-    {
-        $dirPath = sprintf('%s/%s', self::$testDir, uniqid());
-
-        $this->assertFalse(
-            self::$instance->exists($dirPath),
-            "Directory path should not already exist: {$dirPath}");
-
-        self::$instance->putDirectory($dirPath);
-
-        $this->assertTrue(
-            self::$instance->exists($dirPath),
-            "Directory path should exist: {$dirPath}");
-
-        $dir = self::$instance->getObjectAsStream($dirPath);
-        $this->assertEquals(
-            $dir['headers']['Content-Type'][0],
-            'application/x-json-stream; type=directory',
-            "Wrong content type for directory"
-        );
-    }
-
-    /** @test if we can overwrite an existing directory */
-    public function canOverwriteSingleDirectory()
-    {
-        $dirPath = sprintf('%s/%s', self::$testDir, uniqid());
-
-        $this->assertFalse(
-            self::$instance->exists($dirPath),
-            "Directory path should not already exist: {$dirPath}");
-
-        self::$instance->putDirectory($dirPath);
-
-        $this->assertTrue(
-            self::$instance->exists($dirPath),
-            "Directory path should exist: {$dirPath}");
-
-        $dir = self::$instance->getObjectAsStream($dirPath);
-        $this->assertEquals(
-            $dir['headers']['Content-Type'][0],
-            'application/x-json-stream; type=directory',
-            "Wrong content type for directory"
-        );
-
-        // This will error if there is a problem overwriting
-        self::$instance->putDirectory($dirPath);
-    }
-
     /** @test if we can put an object from a string and then get it */
     public function canPutObjectFromStringAnAndGetIt()
     {

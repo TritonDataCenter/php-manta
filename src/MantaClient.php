@@ -332,20 +332,76 @@ class MantaClient
             'Content-Type' => 'application/json; type=directory'
         );
 
+        $resultHeaders = array();
+
         if ($make_parents) {
             $parents = explode('/', $directory);
-            $directory = '';
+            $directoryTree = '';
+
+            $resultHeaders['all_headers'] = array();
+
             foreach ($parents as $parent) {
-                $directory .= $parent . '/';
-                $result = $this->execute('PUT', $directory, $headers);
+                $directoryTree .= $parent . '/';
+
+                if (!self::canCreateDirectoryAtPath($directoryTree)) {
+                    continue;
+                }
+
+                $result = $this->execute('PUT', $directoryTree, $headers);
+                $resultHeaders['all_headers'][] = $result->getHeaders();
             }
         } else {
             $result = $this->execute('PUT', $directory, $headers);
+            $resultHeaders['headers'] = $result->getHeaders();
         }
 
-        return array(
-            'headers' => $result->getHeaders()
-        );
+        return $resultHeaders;
+    }
+
+    /**
+     * Checks to see if you can create a directory at a given path using known
+     * rules for directory structures on Manta.
+     *
+     * @param string $directory path to directory to create
+     * @return boolean          TRUE if you can create the directory at the path
+     */
+    private static function canCreateDirectoryAtPath($directory)
+    {
+        return !empty($directory) && !self::isRootOrFirstLevel($directory);
+    }
+
+    /**
+     * Checks to see if a given directory is the root directory or the very
+     * first directory from the root.
+     *
+     * @param string $directory directory path
+     * @return boolean TRUE if directory is root or one level under
+     */
+    private static function isRootOrFirstLevel($directory)
+    {
+        if ($directory == '/') {
+            return true;
+        }
+
+        $count = 0;
+        $length = strlen($directory);
+
+        // Exit now because we aren't a slash and there are no more characters
+        if ($length == 1) {
+            return false;
+        }
+
+        for($i = 1; $i < $length; $i++) {
+            if (substr($directory, $i, 1) == '/') {
+                $count++;
+
+                if ($count > 1) {
+                    break;
+                }
+            }
+        }
+
+        return $count == 1;
     }
 
     /**
