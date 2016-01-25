@@ -31,20 +31,14 @@ class MantaClientJobIT extends PHPUnit_Framework_TestCase
         }
     }
 
-    /** @test if we can create a Manta job */
-    public function canCreateJob() {
+    /** @test if we can create a job */
+    public function canCreateAndCancelJob() {
         $testId = uniqid();
-
-        $objectPath = sprintf('%s/%s', self::$testDir, $testId);
-        $data = 'Job test object';
-        self::$instance->putObject($data, $objectPath);
-
-        $this->assertTrue(self::$instance->exists($objectPath));
 
         $phases = array(
             array(
                 'type' => 'map',
-                'exec' => "cat {$objectPath}"
+                'exec' => "cat"
             )
         );
 
@@ -62,5 +56,75 @@ class MantaClientJobIT extends PHPUnit_Framework_TestCase
         } finally {
             self::$instance->cancelJob($job['jobId']);
         }
+    }
+
+    /** @test if we can attach inputs to a job */
+    public function canAttachInputsToJobAndRunJob()
+    {
+        $testId = uniqid();
+
+        $objectPath = sprintf('%s/%s', self::$testDir, $testId);
+        $data = <<<EOD
+exclude me
+bb 1
+another ignored line
+bb 2
+also ignore this
+bb 3
+bb 3
+EOD;
+
+        self::$instance->putObject($data, $objectPath);
+
+        $this->assertTrue(self::$instance->exists($objectPath));
+
+        $phases = array(
+            array(
+                'type' => 'map',
+                'exec' => "grep bb"
+            ),
+            array(
+                'type' => 'reduce',
+                'exec' => 'sort | uniq'
+            )
+        );
+
+        $name = "php-manta-test-{$testId}";
+
+        $job = self::$instance->createJob($phases, $name);
+
+        $inputs = array($objectPath);
+        $added = self::$instance->addJobInputs($job['jobId'], $inputs);
+        $this->assertArrayHasKey('headers', $added, 'Inputs not attached');
+
+        $ended = self::$instance->endJobInput($job['jobId']);
+        $this->assertArrayHasKey('headers', $ended, 'Job not ended');
+
+        $tries = 20;
+        $state = 'running';
+
+        for ($try = 0; $try < $tries && $state != 'done'; $try++) {
+            sleep(2);
+            $state = self::$instance->getJobState($job['jobId']);
+        }
+
+        $this->assertEquals('done', $state, 'Job state should be done');
+
+        $outputPath = self::$instance->getJobOutput($job['jobId'])['data'][0];
+
+        $expected = <<<EOD
+bb 1
+bb 2
+bb 3
+
+EOD;
+
+        $actual = self::$instance->getObjectAsString($outputPath)['data'];
+
+        $this->assertEquals(
+            $expected,
+            $actual,
+            'Job output did not match expectation'
+        );
     }
 }

@@ -817,6 +817,9 @@ class MantaClient
     }
 
     /**
+     * Associates files on the Manta filesystem with a job, so that the job
+     * can access those files.
+     *
      * @see http://apidocs.joyent.com/manta/api.html#AddJobInputs
      * @since 2.0.0
      * @api
@@ -824,7 +827,7 @@ class MantaClient
      * @param string $job_id    Job id returned by CreateJob
      * @param array  $inputs    Array of object names to use as inputs
      *
-     * @return boolean TRUE on success
+     * @return array with 'headers' element
      */
     public function addJobInputs($job_id, $inputs)
     {
@@ -832,26 +835,36 @@ class MantaClient
             'Content-Type' => 'text/plain'
         );
         $data = implode("\n", $inputs);
-        $result = $this->execute('POST', "jobs/{$job_id}/live/in", $headers, $data);
-        return $result;
+        $response = $this->execute('POST', "/{$this->login}/jobs/{$job_id}/live/in", $headers, $data);
+
+        return array(
+            'headers' => $response->getHeaders()
+        );
     }
 
     /**
+     * Runs a job. This method closes the job such that it can't accept new inputs.
+     *
      * @see http://apidocs.joyent.com/manta/api.html#EndJobInput
      * @since 2.0.0
      * @api
      *
-     * @param string $job_id    Job id returned by CreateJob
+     * @param string $jobId    Job id returned by CreateJob
      *
-     * @return boolean TRUE on success
+     * @return array with 'headers' element
      */
-    public function endJobInput($job_id)
+    public function endJobInput($jobId)
     {
-        $result = $this->execute('POST', "jobs/{$job_id}/live/in/end");
-        return $result;
+        $response = $this->execute('POST', "/{$this->login}/jobs/{$jobId}/live/in/end");
+
+        return array(
+            'headers' => $response->getHeaders()
+        );
     }
 
     /**
+     * Cancels a job that has not been closed or is currently running.
+     *
      * @see http://apidocs.joyent.com/manta/api.html#CancelJob
      * @since 2.0.0
      * @api
@@ -879,7 +892,7 @@ class MantaClient
     public function listJobs()
     {
         $retval = array();
-        $result = $this->execute('GET', "jobs", null, null, true);
+        $result = $this->execute('GET', "/{$this->login}/jobs", null, null, true);
 
         $retval['headers'] = $result['headers'];
         $retval['data'] = $this->parseJSONList($result['data']);
@@ -888,19 +901,45 @@ class MantaClient
     }
 
     /**
+     * Retrieves a job's metadata including its state.
+     *
      * @see http://apidocs.joyent.com/manta/api.html#GetJob
      * @since 2.0.0
      * @api
      *
-     * @param string $job_id    Job id returned by CreateJob
+     * @param string $jobId Job id returned by CreateJob
      *
-     * @return object Job container object
+     * @return array        with 'headers' and 'data' elements where 'data' contains the list of output objects
      */
-    public function getJob($job_id)
+    public function getJob($jobId)
     {
-        $result = $this->execute('GET', "jobs/{$job_id}/live/status", null, null, true);
-        $retval = json_decode($result['data']);
-        return $retval;
+        $response = $this->execute('GET', "/{$this->login}/jobs/{$jobId}/live/status", null, null, true);
+        $headers = $response->getHeaders();
+        $data = json_decode($response->getBody());
+
+        return array(
+            'headers' => $headers,
+            'data'    => $data
+        );
+    }
+
+    /**
+     * Retrieves the current state of a job.
+     *
+     * @see http://apidocs.joyent.com/manta/api.html#GetJob
+     * @since 2.0.0
+     * @api
+     *
+     * @param string $jobId Job id returned by CreateJob
+     *
+     * @return string       state string returned from Manta
+     */
+    public function getJobState($jobId)
+    {
+        $response = $this->getJob($jobId);
+        assert(array_key_exists('data', $response));
+
+        return $response['data']->{'state'};
     }
 
     /**
@@ -908,19 +947,21 @@ class MantaClient
      * @since 2.0.0
      * @api
      *
-     * @param string $job_id    Job id returned by CreateJob
+     * @param string $jobId    Job id returned by CreateJob
      *
      * @return array with 'headers' and 'data' elements where 'data' contains the list of output objects
      */
-    public function getJobOutput($job_id)
+    public function getJobOutput($jobId)
     {
-        $retval = array();
-        $result = $this->execute('GET', "jobs/{$job_id}/live/out", null, null, true);
+        $response = $this->execute('GET', "/{$this->login}/jobs/{$jobId}/live/out", null, null, true);
 
-        $retval['headers'] = $result['headers'];
-        $retval['data'] = $this->parseTextList($result['data']);
+        $headers = $response->getHeaders();
+        $data = $this->parseTextList($response->getBody());
 
-        return $retval;
+        return array(
+            'headers' => $headers,
+            'data'    => $data
+        );
     }
 
     /**
@@ -935,7 +976,7 @@ class MantaClient
     public function getJobInput($job_id)
     {
         $retval = array();
-        $result = $this->execute('GET', "jobs/{$job_id}/live/in", null, null, true);
+        $result = $this->execute('GET', "/{$this->login}/jobs/{$job_id}/live/in", null, null, true);
 
         $retval['headers'] = $result['headers'];
         $retval['data'] = $this->parseTextList($result['data']);
@@ -955,7 +996,7 @@ class MantaClient
     public function getJobFailures($job_id)
     {
         $retval = array();
-        $result = $this->execute('GET', "jobs/{$job_id}/live/fail", null, null, true);
+        $result = $this->execute('GET', "/{$this->login}/jobs/{$job_id}/live/fail", null, null, true);
 
         $retval['headers'] = $result['headers'];
         $retval['data'] = $this->parseTextList($result['data']);
@@ -975,7 +1016,7 @@ class MantaClient
     public function getJobErrors($job_id)
     {
         $retval = array();
-        $result = $this->execute('GET', "jobs/{$job_id}/live/err", null, null, true);
+        $result = $this->execute('GET', "/{$this->login}/jobs/{$job_id}/live/err", null, null, true);
 
         $retval['headers'] = $result['headers'];
         $retval['data'] = $this->parseJSONList($result['data']);
