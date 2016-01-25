@@ -4,6 +4,7 @@
  * the public or the private cloud.
  */
 
+use Ramsey\Uuid\Uuid;
 use GuzzleHttp\Psr7\Response;
 use GuzzleHttp\Psr7\StreamWrapper;
 use Psr\Http\Message\RequestInterface;
@@ -233,8 +234,10 @@ class MantaClient
             $timestamp = gmdate('r');
             $authorization = $this->getAuthorization($timestamp);
 
-            return $request->withHeader('Date', $timestamp)
-                ->withHeader('Authorization', $authorization);
+            return $request
+                ->withHeader('Date', $timestamp)
+                ->withHeader('Authorization', $authorization)
+                ->withHeader('x-request-id', (string)Uuid::uuid4());
         }));
 
         return $stack;
@@ -262,9 +265,8 @@ class MantaClient
      *
      * @see https://datatracker.ietf.org/doc/draft-cavage-http-signatures/ HTTP Signatures RFC Proposal
      *
-     * @param string $timestamp Data to encrypt for signature (typically timestamp and other parameters)
-     *
-     * @return string      Fully encoded authorization header
+     * @param  string $timestamp Data to encrypt for signature (typically timestamp and other parameters)
+     * @return string            Fully encoded authorization header
      */
     protected function getAuthorization($timestamp)
     {
@@ -338,6 +340,7 @@ class MantaClient
             throw new MantaException(
                 $res->getReasonPhrase(),
                 $res->getStatusCode(),
+                $res->getHeaderLine('x-request-id'),
                 $jsonDetail);
         }
 
@@ -597,6 +600,7 @@ class MantaClient
         if (is_string($data)) {
             $headers['Content-MD5'] = base64_encode(md5($data, true));
         }
+
         // TODO: Figure out how to performantly handle MD5's for streams
 
         $response = $this->execute('PUT', $object, $headers, $data);
@@ -713,7 +717,7 @@ class MantaClient
      *
      * @param string $object        Name of object
      *
-     * @return array with 'headers'  element
+     * @return array with 'headers' element
      */
     public function deleteObject($object)
     {
@@ -758,25 +762,58 @@ class MantaClient
      * @since 2.0.0
      * @api
      *
+     * @param array  $phases    Array of MantaJobPhase objects
      * @param string $name      Name of job
-     * @param array $phases    Array of MantaJobPhase objects
      *
-     * @return array with 'headers' and 'data' elements
+     * @return array with 'headers', 'jobId' and 'headers' elements
      */
-    public function createJob($name, $phases)
+    public function createJob($phases, $name = null)
     {
         $headers = array(
             'Content-Type' => 'application/json'
         );
-        $data = json_encode($phases);
-        $result = $this->execute('POST', "jobs", $headers, $data, true);
 
-        // Extract the job ID if it was returned
-        if (!empty($result['headers']['Location'])) {
-            $result['headers']['job_id'] = array_pop(explode('/', $result['headers']['Location']));
+        $body = array(
+            'phases' => $phases
+        );
+
+        if (!empty($name)) {
+            $body['name'] = $name;
         }
 
-        return $result;
+        $data = json_encode($body);
+        $response = $this->execute('POST', "/{$this->login}/jobs", $headers, $data, true);
+        $location = $response->getHeaderLine('location');
+        $jobId = self::extractJobIdFromLocation($location);
+
+        return array(
+            'jobId'    => $jobId,
+            'location' => $location,
+            'headers'  => $response->getHeaders()
+        );
+    }
+
+    /**
+     * Extracts the job id from a location path that is returned when creating
+     * a new job.
+     *
+     * @param string $location path to job on the Manta filesystem
+     * @return string UUID as a string
+     */
+    protected static function extractJobIdFromLocation($location)
+    {
+        if (empty($location)) {
+            return null;
+        }
+
+        $matches = array();
+        preg_match('/^\/.+\/(.+)$/', $location, $matches);
+
+        if (empty($matches) || count($matches) < 2) {
+            return null;
+        }
+
+        return $matches[1];
     }
 
     /**
@@ -784,8 +821,8 @@ class MantaClient
      * @since 2.0.0
      * @api
      *
-     * @param string job_id    Job id returned by CreateJob
-     * @param array inputs    Array of object names to use as inputs
+     * @param string $job_id    Job id returned by CreateJob
+     * @param array  $inputs    Array of object names to use as inputs
      *
      * @return boolean TRUE on success
      */
@@ -819,14 +856,17 @@ class MantaClient
      * @since 2.0.0
      * @api
      *
-     * @param string $job_id    Job id returned by CreateJob
+     * @param string $jobId    Job id returned by CreateJob
      *
-     * @return boolean TRUE on success
+     * @return array with 'headers' element
      */
-    public function cancelJob($job_id)
+    public function cancelJob($jobId)
     {
-        $result = $this->execute('POST', "jobs/{$job_id}/live/cancel");
-        return $result;
+        $response = $this->execute('POST', "/{$this->login}/jobs/{$jobId}/live/cancel");
+
+        return array(
+            'headers' => $response->getHeaders()
+        );
     }
 
     /**

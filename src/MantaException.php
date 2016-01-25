@@ -4,11 +4,17 @@ class MantaException extends \Exception
 {
     public $serverCode;
     public $serverMessage;
+    public $requestId;
 
     /**
      * MantaException constructor.
+     *
+     * @param string  $message     HTTP error message
+     * @param integer $errorNo     HTTP error number
+     * @param string  $requestId   UUID request id
+     * @param string  $jsonDetails Raw JSON data
      */
-    public function __construct($message, $errorNo, $jsonDetails = null)
+    public function __construct($message, $errorNo, $requestId, $jsonDetails = null)
     {
         $details = null;
 
@@ -17,11 +23,13 @@ class MantaException extends \Exception
                 $errorDetails = json_decode($jsonDetails);
                 $this->serverCode = $errorDetails->{'code'};
                 $this->serverMessage = $errorDetails->{'message'};
+                $this->requestId = $requestId;
 
                 $details = sprintf(
-                    '[%s] %s',
+                    '[%s] %s (%s)',
                     $this->serverCode,
-                    $this->serverMessage);
+                    $this->serverMessage,
+                    $this->requestId);
             } catch (\Exception $e) {
                 // Ignore any errors, we just let $details stay null
             }
