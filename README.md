@@ -10,7 +10,6 @@ We are seeking active contributors right now. Pull requests are welcome.
 
 ## Required PHP Framework Features
  * [OpenSSL](http://php.net/manual/en/openssl.installation.php)
- * [libcurl](http://php.net/manual/en/curl.installation.php)
  * [JSON](http://php.net/manual/en/json.installation.php) - Installed by default in newest versions
 
 ## Credits
