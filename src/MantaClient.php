@@ -943,6 +943,11 @@ class MantaClient
     }
 
     /**
+     * Retrieves a live list of all of the objects that have completed
+     * processing. There is a hard limit of 100 results, so this method is
+     * intended for getting information about the progress of a running job
+     * rather than getting a comprehensive list of all of the outputs.
+     *
      * @see http://apidocs.joyent.com/manta/api.html#GetJobOutput
      * @since 2.0.0
      * @api
@@ -951,9 +956,35 @@ class MantaClient
      *
      * @return array with 'headers' and 'data' elements where 'data' contains the list of output objects
      */
-    public function getJobOutput($jobId)
+    public function getJobLiveOutputs($jobId)
     {
         $response = $this->execute('GET', "/{$this->login}/jobs/{$jobId}/live/out", null, null, true);
+
+        $headers = $response->getHeaders();
+        $data = $this->parseTextList($response->getBody());
+
+        return array(
+            'headers' => $headers,
+            'data'    => $data
+        );
+    }
+
+    /**
+     * Retrieves a live list of all of the objects that have completed
+     * processing. This method is intended for getting a comprehensive list
+     * of all of the outputs.
+     *
+     * @see http://apidocs.joyent.com/manta/api.html#GetObject
+     * @since 2.0.0
+     * @api
+     *
+     * @param string $jobId    Job id returned by CreateJob
+     *
+     * @return array with 'headers' and 'data' elements where 'data' contains the list of output objects
+     */
+    public function getJobOutputs($jobId)
+    {
+        $response = $this->execute('GET', "/{$this->login}/jobs/{$jobId}/out.txt", null, null, true);
 
         $headers = $response->getHeaders();
         $data = $this->parseTextList($response->getBody());

@@ -110,8 +110,6 @@ EOD;
 
         $this->assertEquals('done', $state, 'Job state should be done');
 
-        $outputPath = self::$instance->getJobOutput($job['jobId'])['data'][0];
-
         $expected = <<<EOD
 bb 1
 bb 2
@@ -119,11 +117,23 @@ bb 3
 
 EOD;
 
-        $actual = self::$instance->getObjectAsString($outputPath)['data'];
+        // This uses the live endpoint
+        $liveOutputPath = self::$instance->getJobLiveOutputs($job['jobId'])['data'][0];
+        $actualLiveOutput = self::$instance->getObjectAsString($liveOutputPath)['data'];
 
         $this->assertEquals(
             $expected,
-            $actual,
+            $actualLiveOutput,
+            'Job output did not match expectation'
+        );
+
+        // This uses the endpoint that returns data for archived jobs
+        $outputPath = self::$instance->getJobOutputs($job['jobId'])['data'][0];
+        $actualOutput = self::$instance->getObjectAsString($outputPath)['data'];
+
+        $this->assertEquals(
+            $expected,
+            $actualOutput,
             'Job output did not match expectation'
         );
     }
