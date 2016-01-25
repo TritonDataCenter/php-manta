@@ -38,9 +38,6 @@ class MantaClient
     const DEFAULT_MANTA_KEY_PATH_SUFFIX = "/.ssh/id_rsa";
     /** Default encryption algorithm. */
     const DEFAULT_HTTP_SIGN_ALGO = 'RSA-SHA256';
-    /** Default libcurl options. */
-    const DEFAULT_CURL_OPTS = array(CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1,
-        CURLOPT_SSL_VERIFYPEER, 0);
     /** Maximum number of bytes to read from private key file. */
     const MAXIMUM_PRIV_KEY_SIZE = 51200;
     /** Templated header used for HTTP signature authentication. */
@@ -52,7 +49,6 @@ class MantaClient
     protected $keyid = null;
     protected $algo = null;
     protected $privateKeyContents = null;
-    protected $curlopts = null;
 
     /**
      * Constructor that will accept explicit parameters for building a Manta
@@ -66,15 +62,13 @@ class MantaClient
      * @param string|null keyid               Manta keyid
      * @param string|null privateKeyContents  Client SSH private key
      * @param string|null algo                Algorithm to use for signatures; valid values are RSA-SHA1, RSA-SHA256, DSA-SHA
-     * @param array|null  curlopts            Additional curl options to set for requests
      */
     public function __construct(
         $endpoint = null,
         $login = null,
         $keyid = null,
         $privateKeyContents = null,
-        $algo = null,
-        $curlopts = null
+        $algo = null
     ) {
         $this->endpoint = self::paramEnvOrDefault(
             $endpoint,
@@ -121,12 +115,6 @@ class MantaClient
             null,
             self::DEFAULT_HTTP_SIGN_ALGO,
             "algo"
-        );
-        $this->curlopts = self::paramEnvOrDefault(
-            $curlopts,
-            null,
-            self::DEFAULT_CURL_OPTS,
-            "curlopts"
         );
     }
 
