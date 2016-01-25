@@ -471,7 +471,7 @@ class MantaClient
                     if ('directory' == $item['type']) {
                         $response = $this->deleteDirectory("{$directory}/{$item['name']}", true);
                     } elseif ('object' == $item['type']) {
-                        $response = $this->deleteObject($item['name'], $directory);
+                        $response = $this->deleteObject("{$directory}/{$item['name']}");
                     }
 
                     if (is_null($response)) {
@@ -623,24 +623,29 @@ class MantaClient
     }
 
     /**
+     * Deletes an object from Manta.
      *
      * @see http://apidocs.joyent.com/manta/api.html#DeleteObject
      * @since 2.0.0
      * @api
      *
      * @param string $object        Name of object
-     * @param string|null $directory     Name of directory
      *
-     * @return boolean TRUE on success
+     * @return array with 'headers'  element
      */
-    public function deleteObject($object, $directory = null)
+    public function deleteObject($object)
     {
-        $objpath = !empty($directory) ? "{$directory}/{$object}" : $object;
-        $result = $this->execute('DELETE', "{$objpath}");
-        return $result;
+        $response = $this->execute('DELETE', $object);
+
+        return array(
+            'headers' => $response->getHeaders()
+        );
     }
 
     /**
+     * Creates a remote copy of a file on Manta. This copy does not use any
+     * additional disk space and will persist even if the original file
+     * is deleted. See the Manta documentation for more details.
      *
      * @see http://apidocs.joyent.com/manta/api.html#PutSnapLink
      * @since 2.0.0
@@ -649,16 +654,20 @@ class MantaClient
      * @param string $link          Link
      * @param string $source        Path to source object
      *
-     * @return boolean TRUE on success
+     * @return array with 'headers' element
      */
-    public function putSnapLink($link, $source)
+    public function putSnapLink($source, $link)
     {
         $headers = array(
             'Content-Type' => 'application/json; type=link',
             'Location'     => $source,
         );
-        $result = $this->execute('PUT', "{$link}", $headers);
-        return true;
+
+        $response = $this->execute('PUT', $link, $headers);
+
+        return array(
+            'headers' => $response->getHeaders()
+        );
     }
 
     /**

@@ -1,5 +1,5 @@
 <?php
-class MantaClientIT extends PHPUnit_Framework_TestCase
+class MantaClientObjectIT extends PHPUnit_Framework_TestCase
 {
     /** @var string path to directory containing the test directory */
     private static $baseDir;
@@ -134,4 +134,61 @@ class MantaClientIT extends PHPUnit_Framework_TestCase
         $this->assertEquals($data, $objectContents, "Remote object data is not equal to data stored");
     }
 
+    /** @test if we can get an object as a file */
+    public function canPutObjectAndGetAsFile()
+    {
+        $data = "Plain-text test data";
+        $objectPath = sprintf('%s/%s.txt', self::$testDir, uniqid());
+        $putResponse = self::$instance->putObject($data, $objectPath);
+        $this->assertArrayHasKey('headers', $putResponse, "Object not inserted: {$objectPath}");
+
+        $objectResponse = self::$instance->getObjectAsFile($objectPath);
+        $this->assertArrayHasKey('file', $objectResponse);
+        $file = $objectResponse['file'];
+        try {
+            $objectContents = file_get_contents($file);
+            $this->assertEquals($data, $objectContents, "Remote object data is not equal to data stored");
+        } finally {
+            unlink($file);
+        }
+    }
+
+    /** @test if we can delete an object */
+    public function canPutAndDeleteObject()
+    {
+        $data = "Plain-text test data";
+        $objectPath = sprintf('%s/%s.txt', self::$testDir, uniqid());
+        self::$instance->putObject($data, $objectPath);
+        $this->assertTrue(self::$instance->exists($objectPath));
+
+        self::$instance->deleteObject($objectPath);
+        $this->assertFalse(
+            self::$instance->exists($objectPath),
+            "Object wasn't deleted: {$objectPath}");
+    }
+
+    /** @test if we can create a snaplink */
+    public function canCreateSnapLink()
+    {
+        $data = "Plain-text test data";
+        $objectPath = sprintf('%s/%s.txt', self::$testDir, uniqid());
+        self::$instance->putObject($data, $objectPath);
+        $this->assertTrue(self::$instance->exists($objectPath));
+
+        $linkPath = sprintf('%s/%s.txt', self::$testDir, uniqid());
+
+        $response = self::$instance->putSnapLink($objectPath, $linkPath);
+        $this->assertArrayHasKey('headers', $response);
+
+        $this->assertTrue(
+            self::$instance->exists($linkPath),
+            "Snaplink wasn't created: {$linkPath}"
+        );
+
+        $this->assertEquals(
+            $data,
+            self::$instance->getObjectAsString($objectPath)['data'],
+            "Snaplink data isn't identical"
+        );
+    }
 }
