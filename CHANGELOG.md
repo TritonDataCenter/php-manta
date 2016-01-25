@@ -21,3 +21,4 @@ This project adheres to [Semantic Versioning](http://semver.org/).
  - We now encode file and directory paths in a URL safe encoding.
  - Minimum PHP version is now 5.6.
  - Switched client HTTP library from libcurl to guzzle.
+ - Changed get method to getObjectAs* (getObjectAsString, getObjectAsStream, getObjectAsFile)
