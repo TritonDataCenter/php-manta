@@ -21,7 +21,6 @@
   },
   "require": {
     "ext-openssl": "*",
-    "ext-curl": "*",
     "ext-json": "*",
     "guzzlehttp/guzzle": "^6.1"
   },

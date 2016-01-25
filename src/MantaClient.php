@@ -8,7 +8,6 @@ use GuzzleHttp\Psr7\Response;
 use GuzzleHttp\Psr7\StreamWrapper;
 use Psr\Http\Message\RequestInterface;
 use GuzzleHttp\HandlerStack;
-use GuzzleHttp\Handler\CurlHandler;
 use GuzzleHttp\Client;
 use GuzzleHttp\Middleware;
 use Psr\Http\Message\StreamInterface;
@@ -32,23 +31,49 @@ class MantaClient
     const MANTA_KEY_ID_ENV_KEY = "MANTA_KEY_ID";
     /** Environment variable indicating the path to the private key. */
     const MANTA_KEY_PATH_ENV_KEY = 'MANTA_KEY_PATH';
+    /** Environment variable indicating the HTTP handler implementation. */
+    const MANTA_HTTP_HANDLER_KEY = 'MANTA_HTTP_HANDLER';
+    /** Environment variable indicating the timeout for HTTP requests. */
+    const MANTA_TIMEOUT_KEY = 'MANTA_TIMEOUT';
+    /** Environment variable indicating to turn off TLS key verification. */
+    const MANTA_TLS_INSECURE_KEY = 'MANTA_TLS_INSECURE';
+
     /** Default value for Manta REST endpoint. */
     const DEFAULT_MANTA_URL = 'https://us-east.manta.joyent.com:443';
     /** Default path suffix for private encryption key. */
     const DEFAULT_MANTA_KEY_PATH_SUFFIX = "/.ssh/id_rsa";
     /** Default encryption algorithm. */
     const DEFAULT_HTTP_SIGN_ALGO = 'RSA-SHA256';
+    /** Default HTTP timeout. */
+    const DEFAULT_TIMEOUT = 20.0;
+    /** Default HTTP handler class. */
+    const DEFAULT_HTTP_HANDLER = 'GuzzleHttp\Handler\StreamHandler';
+
     /** Maximum number of bytes to read from private key file. */
     const MAXIMUM_PRIV_KEY_SIZE = 51200;
     /** Templated header used for HTTP signature authentication. */
     const AUTH_HEADER = 'Signature keyId="/%s/keys/%s",algorithm="%s",signature="%s"';
 
     // Properties
+
+    /** @var null|string Root endpoint to make HTTP requests against */
     protected $endpoint = null;
+    /** @var null|string  Manta primary account name */
     protected $login = null;
+    /** @var null|string RSA key fingerprint */
     protected $keyid = null;
+    /** @var null|string HTTP signature algorithm name*/
     protected $algo = null;
+    /** @var null|string Contents of RSA private key used for HTTP signing */
     protected $privateKeyContents = null;
+    /** @var null|float Timeout in seconds for HTTP calls */
+    protected $timeout = null;
+    /** @var null|HandlerStack HTTP implementation to use for making calls */
+    protected $handlerStack = null;
+    /** @var null|boolean Flag indicating if we should validate TLS keys  */
+    protected $insecureTlsKey = null;
+    /** @var null|Client HTTP client instance  */
+    protected $client = null;
 
     /**
      * Constructor that will accept explicit parameters for building a Manta
@@ -57,18 +82,24 @@ class MantaClient
      * @since 2.0.0
      * @api
      *
-     * @param string|null endpoint            Manta endpoint to use for requests (e.g. https://us-east.manta.joyent.com)
-     * @param string|null login               Manta login
-     * @param string|null keyid               Manta keyid
-     * @param string|null privateKeyContents  Client SSH private key
-     * @param string|null algo                Algorithm to use for signatures; valid values are RSA-SHA1, RSA-SHA256, DSA-SHA
+     * @param string|null  endpoint            Manta endpoint to use for requests (e.g. https://us-east.manta.joyent.com)
+     * @param string|null  login               Manta login
+     * @param string|null  keyid               Manta keyid
+     * @param string|null  privateKeyContents  Client SSH private key
+     * @param string|null  algo                Algorithm to use for signatures; valid values are RSA-SHA1, RSA-SHA256, DSA-SHA
+     * @param float|null   timeout             Float describing the timeout of the request in seconds. Use 0 to wait indefinitely (the default behavior)
+     * @param string|null  handler             Name of the Guzzle handler class to use for making HTTP calls (e.g. GuzzleHttp\Handler\CurlHandler)
+     * @param boolean|null insecureTlsKey       When true we don't verify TLS keys
      */
     public function __construct(
         $endpoint = null,
         $login = null,
         $keyid = null,
         $privateKeyContents = null,
-        $algo = null
+        $algo = null,
+        $timeout = null,
+        $handler = null,
+        $insecureTlsKey = null
     ) {
         $this->endpoint = self::paramEnvOrDefault(
             $endpoint,
@@ -116,6 +147,35 @@ class MantaClient
             self::DEFAULT_HTTP_SIGN_ALGO,
             "algo"
         );
+
+        $this->timeout = self::paramEnvOrDefault(
+            $timeout,
+            self::MANTA_TIMEOUT_KEY,
+            self::DEFAULT_TIMEOUT,
+            "timeout"
+        );
+
+        $handlerClass = self::paramEnvOrDefault(
+            $handler,
+            self::MANTA_HTTP_HANDLER_KEY,
+            self::DEFAULT_HTTP_HANDLER,
+            "handler"
+        );
+
+        $this->handlerStack = $this->buildHandlerStack($handlerClass);
+
+        $verifyTlsKeyValue = self::paramEnvOrDefault(
+            $insecureTlsKey,
+            self::MANTA_TLS_INSECURE_KEY,
+            false,
+            "verify TLS key"
+        );
+
+        // Value passed to us may have been an integer
+        $this->insecureTlsKey = (boolean)$verifyTlsKeyValue;
+
+        // Build the HTTP client once, so that we don't have to do it each call
+        $this->client = $this->buildHttpClient();
     }
 
     /**
@@ -123,9 +183,11 @@ class MantaClient
      * the passed value, the associated environment variable's value or the
      * default value for a given parameter.
      *
-     * @param  string|array|null $argValue the value from the constructor's parameter
+     * @param  string|array|float|boolean|null
+     *                           $argValue the value from the constructor's parameter
      * @param  string|null       $envKey   the name of the associated environment variable
-     * @param  string|array|null $default  the default value of the parameter
+     * @param  string|array|float|boolean|null
+     *                           $default  the default value of the parameter
      * @param  string|null       $argName  the name of the parameter for debugging
      * @return string|array                the value chosen based on the inputs
      */
@@ -154,6 +216,44 @@ class MantaClient
         $msg = "You must set the [$argName] argument explicitly or set the " .
             "environment variable [$envKey]";
         throw new \InvalidArgumentException($msg);
+    }
+
+    /**
+     * Creates a HandlerStack based off of the supplied configuration.
+     *
+     * @param string $handlerClass full class name to use for the HTTP handler implementation
+     * @return HandlerStack configured HandlerStack implementation
+     */
+    protected function buildHandlerStack($handlerClass)
+    {
+        $stack = new HandlerStack();
+        $stack->setHandler(new $handlerClass());
+
+        $stack->push(Middleware::mapRequest(function (RequestInterface $request) {
+            $timestamp = gmdate('r');
+            $authorization = $this->getAuthorization($timestamp);
+
+            return $request->withHeader('Date', $timestamp)
+                ->withHeader('Authorization', $authorization);
+        }));
+
+        return $stack;
+    }
+
+    /**
+     * Creates a configured HTTP client instance.
+     *
+     * @return Client configured HTTP client
+     */
+    protected function buildHttpClient() {
+        $params = [
+            'base_uri' => $this->endpoint,
+            'timeout'  => $this->timeout,
+            'version'  => '1.1',
+            'handler'  => $this->handlerStack
+        ];
+
+        return new Client($params);
     }
 
     /**
@@ -204,39 +304,27 @@ class MantaClient
         // We remove redundant leading slashes, so our URLs look clean
         $withLeadingSlash = ltrim(str_replace('//', '/', $path), '/');
 
-        $stack = new HandlerStack();
-        $stack->setHandler(new CurlHandler());
-
-        $stack->push(Middleware::mapRequest(function (RequestInterface $request) {
-            $timestamp = gmdate('r');
-            $authorization = $this->getAuthorization($timestamp);
-
-            return $request->withHeader('Date', $timestamp)
-                           ->withHeader('Authorization', $authorization);
-        }));
-
-        $params = [
-            'headers'  => $headers,
-            'base_uri' => $this->endpoint,
-            'timeout'  => 200,
-            'version'  => '1.1',
-            'handler'  => $stack
-        ];
-
-        $client = new Client($params);
-
         $options = [
-            'proxy'   => 'tcp://127.0.0.1:8888',
-            'verify'  => false
+            'headers'         => $headers,
+            'connect_timeout' => $this->timeout,
+            'verify'          => !$this->insecureTlsKey,
+            // we have our own error handling logic, so we don't need this done for us
+            'http_errors'     => false
         ];
+
+        $proxy = getenv('http_proxy');
+
+        if ($proxy) {
+            $options['proxy'] = "tcp://${proxy}";
+        }
 
         if (!is_null($data)) {
             $options['body'] = $data;
         }
 
-        $res = $client->request($method, $withLeadingSlash, $options);
+        $res = $this->client->request($method, $withLeadingSlash, $options);
 
-        if ($throwErrorOnFailure && $res->getStatusCode() > 299) {
+        if ($throwErrorOnFailure && $res->getStatusCode() > 399) {
             $jsonDetail = null;
 
             try
@@ -298,6 +386,12 @@ class MantaClient
         return $retval;
     }
 
+    /**
+     * Determines if a given object or directory exists in Manta.
+     *
+     * @param $path object path to check
+     * @return boolean TRUE if object exists, otherwise FALSE
+     */
     public function exists($path)
     {
         $result = $this->execute('HEAD', $path, array(), null, false);

@@ -191,4 +191,40 @@ class MantaClientDirectoryIT extends PHPUnit_Framework_TestCase
             "Directory path shouldn't exist: {$basePath}"
         );
     }
+
+    /** @test if we can list directory contents */
+    public function canListDirectoryContents() {
+        $dirPath = sprintf('%s/%s', self::$testDir, uniqid());
+
+        self::$instance->putDirectory($dirPath);
+
+        $object1Name = uniqid();
+        $object2Name = uniqid();
+        $object3Name = uniqid();
+
+        $object1Path = sprintf('%s/%s', $dirPath, $object1Name);
+        $object2Path = sprintf('%s/%s', $dirPath, $object2Name);
+        $object3Path = sprintf('%s/%s', $dirPath, $object3Name);
+
+        $data = "sample content";
+        self::$instance->putObject($data, $object1Path);
+        self::$instance->putObject($data, $object2Path);
+        self::$instance->putObject($data, $object3Path);
+
+        $contents = self::$instance->listDirectory($dirPath)['data'];
+
+        $nameMatcher = function($name)
+        {
+            return function ($item) use ($name) { return $item['name'] == $name; };
+        };
+
+        $foundObject1 = array_filter($contents, $nameMatcher($object1Name));
+        $this->assertEquals(1, count($foundObject1));
+
+        $foundObject2 = array_filter($contents, $nameMatcher($object3Name));
+        $this->assertEquals(1, count($foundObject2));
+
+        $foundObject3 = array_filter($contents, $nameMatcher($object3Name));
+        $this->assertEquals(1, count($foundObject3));
+    }
 }
