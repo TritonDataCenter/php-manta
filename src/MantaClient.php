@@ -5,11 +5,13 @@
  */
 
 use GuzzleHttp\Psr7\Response;
+use GuzzleHttp\Psr7\StreamWrapper;
 use Psr\Http\Message\RequestInterface;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Handler\CurlHandler;
 use GuzzleHttp\Client;
 use GuzzleHttp\Middleware;
+use Psr\Http\Message\StreamInterface;
 
 /**
  * Manta client class for interacting with the Manta REST API service endpoint.
@@ -523,13 +525,14 @@ class MantaClient
     }
 
     /**
+     * Retrieve an object from Manta as a in-memory string.
+     * Warning: this function is not memory efficient.
      *
      * @see http://apidocs.joyent.com/manta/api.html#GetObject
      * @since 2.0.0
      * @api
      *
-     * @param string $object        Name of object
-     * @param string|null directory     Name of directory
+     * @param string $object        Path of object
      *
      * @return array with 'headers' and 'data' elements
      */
@@ -553,13 +556,15 @@ class MantaClient
     }
 
     /**
+     * Retrieve an object from Manta as a stream.
+     * This function is good for general purpose use because it allows you
+     * to stream data in a memory efficient manner.
      *
      * @see http://apidocs.joyent.com/manta/api.html#GetObject
      * @since 2.0.0
      * @api
      *
-     * @param string $object        Name of object
-     * @param string|null directory     Name of directory
+     * @param string $object        Path of object
      *
      * @return array with 'headers' and 'data' elements
      */
@@ -570,6 +575,50 @@ class MantaClient
         return array(
             'headers' => $response->getHeaders(),
             'stream' => $response->getBody()
+        );
+    }
+
+    /**
+     * Retrieve an object from Manta as a temporary file.
+     * This function uses streams to copy a remote file to the local
+     * filesystem as a temporary file.
+     *
+     * Note: this file is not deleted for you.
+     *
+     * @see http://apidocs.joyent.com/manta/api.html#GetObject
+     * @since 2.0.0
+     * @api
+     *
+     * @param string $object        Path of object
+     *
+     * @return array with 'headers' and 'file' elements
+     */
+    public function getObjectAsFile($object) {
+        $results = $this->getObjectAsStream($object);
+        $headers = $results['headers'];
+        /** @var StreamInterface $stream stream of Manta object contents */
+        $stream = $results['stream'];
+        $input = StreamWrapper::getResource($stream);
+        $tempDir = sys_get_temp_dir();
+        $filePath = tempnam ($tempDir, 'manta-php-');
+        $file = fopen($filePath, 'w');
+
+        try {
+            stream_copy_to_stream($input, $file);
+        } finally {
+            if (is_resource($file)) {
+                fclose($file);
+            }
+
+            if (is_resource($input)) {
+                fclose($input);
+            }
+            $stream->close();
+        }
+
+        return array(
+            'headers' => $headers,
+            'file' => $filePath
         );
     }
 
