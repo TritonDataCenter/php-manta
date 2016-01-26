@@ -513,12 +513,9 @@ class MantaClient
         try
         {
             $responseJson = (string)$body;
-            $result = array (
-                'headers' => $response->getHeaders(),
-                'data'    => $this->parseJSONList($responseJson)
-            );
+            $data = $this->parseJSONList($responseJson);
 
-            return $result;
+            return new MantaArrayResponse($data, $response->getHeaders());
         } finally
         {
             $body->close();
@@ -548,7 +545,7 @@ class MantaClient
 
             $results['all_headers'] = array();
 
-            foreach ($items['data'] as $item) {
+            foreach ($items as $item) {
                 if (!empty($item['type'])) {
                     /** @var Response|null $response */
                     $response = null;
@@ -584,16 +581,32 @@ class MantaClient
     }
 
     /**
+     * Creates or overwrites an object. You specify the path to an object just
+     * as you would on a traditional file system, and the parent must be a
+     * directory. The service will do no interpretation of your data.
+     * Specifically, that means your data is treated as an opaque byte stream,
+     * and you will receive back exactly what you upload.
+     *
+     * By default, The service will store two copies of your data on two
+     * physical servers in two different datacenters; note that each physical
+     * server is configured with RAID-Z, so a disk drive failure does not
+     * impact your durability or availability. You can increase (or decrease)
+     * the number of copies of your object with the durability-level header.
+     *
+     * You should always specify a Content-Type header, which will be stored
+     * and returned back (HTTP content-negotiation will be handled). If you
+     * do not specify one, the default is application/octet-stream.
      *
      * @see http://apidocs.joyent.com/manta/api.html#PutObject
      * @since 2.0.0
      * @api
      *
-     * @param data            Data to store
-     * @param string $object  Name of object
-     * @param array  $headers Additional headers; see documentation for valid values
+     * @param  string|resource|StreamInterface
+     *                             Data to store on Manta
+     * @param  string $object      Name of object
+     * @param  array  $headers     Additional headers; see documentation for valid values
      *
-     * @return array          Array containing details of the PUT response
+     * @return MantaHeaderResponse HTTP response object
      */
     public function putObject($data, $object, $headers = array())
     {
@@ -605,9 +618,7 @@ class MantaClient
 
         $response = $this->execute('PUT', $object, $headers, $data);
 
-        return array(
-            'headers' => $response->getHeaders()
-        );
+        return new MantaHeaderResponse($response->getHeaders());
     }
 
     /**
@@ -618,9 +629,9 @@ class MantaClient
      * @since 2.0.0
      * @api
      *
-     * @param string $object        Path of object
+     * @param string $object       Path of object
      *
-     * @return array with 'headers' and 'data' elements
+     * @return MantaStringResponse Response object wrapping string interface
      */
     public function getObjectAsString($object)
     {
@@ -629,12 +640,10 @@ class MantaClient
 
         try
         {
-            $result = array(
-                'headers' => $response->getHeaders(),
-                'data' => (string)$body
+            return new MantaStringResponse(
+                (string)$body,
+                $response->getHeaders()
             );
-
-            return $result;
         } finally
         {
             $body->close();
@@ -715,17 +724,16 @@ class MantaClient
      * @since 2.0.0
      * @api
      *
-     * @param string $object        Name of object
+     * @param  string $object      Name of object
      *
-     * @return array with 'headers' element
+     * @return MantaHeaderResponse HTTP response object
      */
     public function deleteObject($object)
     {
         $response = $this->execute('DELETE', $object);
 
-        return array(
-            'headers' => $response->getHeaders()
-        );
+        return new MantaHeaderResponse($response->getHeaders());
+
     }
 
     /**
@@ -737,10 +745,10 @@ class MantaClient
      * @since 2.0.0
      * @api
      *
-     * @param string $link          Link
-     * @param string $source        Path to source object
+     * @param  string $source      Path to source object
+     * @param  string $link        Path to target object
      *
-     * @return array with 'headers' element
+     * @return MantaHeaderResponse HTTP response object
      */
     public function putSnapLink($source, $link)
     {
@@ -751,12 +759,12 @@ class MantaClient
 
         $response = $this->execute('PUT', $link, $headers);
 
-        return array(
-            'headers' => $response->getHeaders()
-        );
+        return new MantaHeaderResponse($response->getHeaders());
     }
 
     /**
+     * Submits a new job to be executed. This call is not idempotent, so
+     * calling it twice will create two jobs.
      *
      * @see http://apidocs.joyent.com/manta/api.html#CreateJob
      * @since 2.0.0
@@ -786,11 +794,12 @@ class MantaClient
         $location = $response->getHeaderLine('location');
         $jobId = self::extractJobIdFromLocation($location);
 
-        return array(
+        $data = array(
             'jobId'    => $jobId,
             'location' => $location,
-            'headers'  => $response->getHeaders()
         );
+
+        return new MantaArrayResponse($data, $response->getHeaders());
     }
 
     /**
@@ -827,7 +836,7 @@ class MantaClient
      * @param string $job_id    Job id returned by CreateJob
      * @param array  $inputs    Array of object names to use as inputs
      *
-     * @return array with 'headers' element
+     * @return MantaHeaderResponse HTTP response object
      */
     public function addJobInputs($job_id, $inputs)
     {
@@ -837,9 +846,7 @@ class MantaClient
         $data = implode("\n", $inputs);
         $response = $this->execute('POST', "/{$this->login}/jobs/{$job_id}/live/in", $headers, $data);
 
-        return array(
-            'headers' => $response->getHeaders()
-        );
+        return new MantaHeaderResponse($response->getHeaders());
     }
 
     /**
@@ -849,17 +856,15 @@ class MantaClient
      * @since 2.0.0
      * @api
      *
-     * @param string $jobId    Job id returned by CreateJob
+     * @param string $jobId        Job id returned by CreateJob
      *
-     * @return array with 'headers' element
+     * @return MantaHeaderResponse HTTP response object
      */
     public function endJobInput($jobId)
     {
         $response = $this->execute('POST', "/{$this->login}/jobs/{$jobId}/live/in/end");
 
-        return array(
-            'headers' => $response->getHeaders()
-        );
+        return new MantaHeaderResponse($response->getHeaders());
     }
 
     /**
@@ -889,7 +894,7 @@ class MantaClient
      * @since 2.0.0
      * @api
      *
-     * @return array with 'headers' and 'data' elements where 'data' contains the list of items
+     * @return MantaArrayResponse HTTP response as array
      */
     public function listJobs()
     {
@@ -898,10 +903,7 @@ class MantaClient
         $headers = $response->getHeaders();
         $data = $this->parseJSONList($response->getBody());
 
-        return array(
-            'headers' => $headers,
-            'data'    => $data
-        );
+        return new MantaArrayResponse($data, $headers);
     }
 
     /**
@@ -911,9 +913,9 @@ class MantaClient
      * @since 2.0.0
      * @api
      *
-     * @param string $jobId Job id returned by CreateJob
+     * @param  string $jobId      Job id returned by CreateJob
      *
-     * @return array        with 'headers' and 'data' elements where 'data' contains the list of output objects
+     * @return MantaObjectResponse HTTP response as an object
      */
     public function getJob($jobId)
     {
@@ -921,10 +923,7 @@ class MantaClient
         $headers = $response->getHeaders();
         $data = json_decode($response->getBody());
 
-        return array(
-            'headers' => $headers,
-            'data'    => $data
-        );
+        return new MantaObjectResponse($data, $headers);
     }
 
     /**
@@ -941,9 +940,7 @@ class MantaClient
     public function getJobState($jobId)
     {
         $response = $this->getJob($jobId);
-        assert(array_key_exists('data', $response));
-
-        return $response['data']->{'state'};
+        return $response->{'state'};
     }
 
     /**
@@ -956,9 +953,9 @@ class MantaClient
      * @since 2.0.0
      * @api
      *
-     * @param string $jobId    Job id returned by CreateJob
+     * @param  string $jobId      Job id returned by CreateJob
      *
-     * @return array with 'headers' and 'data' elements where 'data' contains the list of output objects
+     * @return MantaArrayResponse HTTP response as array
      */
     public function getJobLiveOutputs($jobId)
     {
@@ -967,10 +964,7 @@ class MantaClient
         $headers = $response->getHeaders();
         $data = $this->parseTextList($response->getBody());
 
-        return array(
-            'headers' => $headers,
-            'data'    => $data
-        );
+        return new MantaArrayResponse($data, $headers);
     }
 
     /**
@@ -982,9 +976,9 @@ class MantaClient
      * @since 2.0.0
      * @api
      *
-     * @param string $jobId    Job id returned by CreateJob
+     * @param  string $jobId      Job id returned by CreateJob
      *
-     * @return array with 'headers' and 'data' elements where 'data' contains the list of output objects
+     * @return MantaArrayResponse HTTP response as array
      */
     public function getJobOutputs($jobId)
     {
@@ -993,10 +987,7 @@ class MantaClient
         $headers = $response->getHeaders();
         $data = $this->parseTextList($response->getBody());
 
-        return array(
-            'headers' => $headers,
-            'data'    => $data
-        );
+        return new MantaArrayResponse($data, $headers);
     }
 
     /**
@@ -1006,9 +997,9 @@ class MantaClient
      * @since 2.0.0
      * @api
      *
-     * @param  string $jobId Job id returned by CreateJob
+     * @param  string $jobId      Job id returned by CreateJob
      *
-     * @return array         with 'headers' and 'data' elements where 'data' contains the list of input objects
+     * @return MantaArrayResponse HTTP response as array
      */
     public function getJobInput($jobId)
     {
@@ -1017,10 +1008,7 @@ class MantaClient
         $headers = $response->getHeaders();
         $data = $this->parseTextList($response->getBody());
 
-        return array(
-            'headers' => $headers,
-            'data'    => $data
-        );
+        return new MantaArrayResponse($data, $headers);
     }
 
     /**
@@ -1032,9 +1020,9 @@ class MantaClient
      * @since 2.0.0
      * @api
      *
-     * @param  string $jobId Job id returned by CreateJob
+     * @param  string $jobId      Job id returned by CreateJob
      *
-     * @return array         with 'headers' and 'data' elements where 'data' contains the list of error objects
+     * @return MantaArrayResponse HTTP response as array
      */
     public function getLiveJobFailures($jobId)
     {
@@ -1043,10 +1031,7 @@ class MantaClient
         $headers = $response->getHeaders();
         $data = $this->parseTextList($response->getBody());
 
-        return array(
-            'headers' => $headers,
-            'data'    => $data
-        );
+        return new MantaArrayResponse($data, $headers);
     }
 
     /**
@@ -1057,9 +1042,9 @@ class MantaClient
      * @since 2.0.0
      * @api
      *
-     * @param  string $jobId Job id returned by CreateJob
+     * @param  string $jobId      Job id returned by CreateJob
      *
-     * @return array         with 'headers' and 'data' elements where 'data' contains the list of error objects
+     * @return MantaArrayResponse HTTP response as array
      */
     public function getJobFailures($jobId)
     {
@@ -1068,10 +1053,7 @@ class MantaClient
         $headers = $response->getHeaders();
         $data = $this->parseTextList($response->getBody());
 
-        return array(
-            'headers' => $headers,
-            'data'    => $data
-        );
+        return new MantaArrayResponse($data, $headers);
     }
 
     /**
@@ -1083,22 +1065,18 @@ class MantaClient
      * @since 2.0.0
      * @api
      *
-     * @param  string $jobId  Job id returned by CreateJob
+     * @param  string $jobId      Job id returned by CreateJob
      *
-     * @return array          with 'headers' and 'data' elements where 'data' contains the errors
+     * @return MantaArrayResponse HTTP response as array
      */
     public function getLiveJobErrors($jobId)
     {
         $response = $this->execute('GET', "/{$this->login}/jobs/{$jobId}/live/err", null, null, true);
 
-
         $headers = $response->getHeaders();
         $data = $this->parseJSONList($response->getBody());
 
-        return array(
-            'headers' => $headers,
-            'data'    => $data
-        );
+        return new MantaArrayResponse($data, $headers);
     }
 
     /**
@@ -1109,21 +1087,17 @@ class MantaClient
      * @since 2.0.0
      * @api
      *
-     * @param  string $jobId  Job id returned by CreateJob
+     * @param  string $jobId      Job id returned by CreateJob
      *
-     * @return array          with 'headers' and 'data' elements where 'data' contains the errors
+     * @return MantaArrayResponse HTTP response as array
      */
     public function getJobErrors($jobId)
     {
         $response = $this->execute('GET', "/{$this->login}/jobs/{$jobId}/err.txt", null, null, true);
 
-
         $headers = $response->getHeaders();
         $data = $this->parseJSONList($response->getBody());
 
-        return array(
-            'headers' => $headers,
-            'data'    => $data
-        );
+        return new MantaArrayResponse($data, $headers);
     }
 }

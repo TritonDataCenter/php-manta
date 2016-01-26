@@ -18,7 +18,7 @@ class MantaClientObjectIT extends PHPUnit_Framework_TestCase
         // Instantiate using environment variables
         self::$instance = new \Joyent\Manta\MantaClient();
         $account = getenv(\Joyent\Manta\MantaClient::MANTA_USER_ENV_KEY);
-        $prefix = Uuid::uuid4();
+        $prefix = (string)Uuid::uuid4();
         self::$baseDir = "/{$account}/stor/php-test/";
         self::$testDir = sprintf('%s/%s', self::$baseDir, $prefix);
 
@@ -37,13 +37,11 @@ class MantaClientObjectIT extends PHPUnit_Framework_TestCase
     public function canPutObjectFromStringAnAndGetIt()
     {
         $data = "Plain-text test data";
-        $objectPath = sprintf('%s/%s.txt', self::$testDir, Uuid::uuid4());
+        $objectPath = sprintf('%s/%s.txt', self::$testDir, (string)Uuid::uuid4());
         $putResponse = self::$instance->putObject($data, $objectPath);
-        $this->assertArrayHasKey('headers', $putResponse, "Object not inserted: {$objectPath}");
+        $this->assertNotNull($putResponse->getHeaders(), "Object not inserted: {$objectPath}");
 
-        $objectResponse = self::$instance->getObjectAsString($objectPath);
-        $this->assertArrayHasKey('data', $objectResponse);
-        $objectContents = $objectResponse['data'];
+        $objectContents = self::$instance->getObjectAsString($objectPath);
         $this->assertEquals($data, $objectContents, "Remote object data is not equal to data stored");
     }
 
@@ -55,13 +53,11 @@ class MantaClientObjectIT extends PHPUnit_Framework_TestCase
 
         try
         {
-            $objectPath = sprintf('%s/%s.txt', self::$testDir, Uuid::uuid4());
+            $objectPath = sprintf('%s/%s.txt', self::$testDir, (string)Uuid::uuid4());
             $putResponse = self::$instance->putObject($file, $objectPath);
-            $this->assertArrayHasKey('headers', $putResponse, "Object not inserted: {$objectPath}");
+            $this->assertNotNull($putResponse->getHeaders(), "Object not inserted: {$objectPath}");
 
-            $objectResponse = self::$instance->getObjectAsString($objectPath);
-            $this->assertArrayHasKey('data', $objectResponse);
-            $objectContents = $objectResponse['data'];
+            $objectContents = self::$instance->getObjectAsString($objectPath);
             $actualContents = file_get_contents("{$filePath}/../data/binary_file", 'r');
             $this->assertEquals($actualContents, $objectContents, "Remote object data is not equal to data stored");
         } finally
@@ -78,13 +74,11 @@ class MantaClientObjectIT extends PHPUnit_Framework_TestCase
     {
         $actualObject = "I'm a stream...";
         $stream = GuzzleHttp\Psr7\stream_for($actualObject);
-        $objectPath = sprintf('%s/%s.txt', self::$testDir, Uuid::uuid4());
+        $objectPath = sprintf('%s/%s.txt', self::$testDir, (string)Uuid::uuid4());
         $putResponse = self::$instance->putObject($stream, $objectPath);
-        $this->assertArrayHasKey('headers', $putResponse, "Object not inserted: {$objectPath}");
+        $this->assertNotNull($putResponse->getHeaders(), "Object not inserted: {$objectPath}");
 
-        $objectResponse = self::$instance->getObjectAsString($objectPath);
-        $this->assertArrayHasKey('data', $objectResponse);
-        $objectContents = $objectResponse['data'];
+        $objectContents = self::$instance->getObjectAsString($objectPath);
         $this->assertEquals($actualObject, $objectContents, "Remote object data is not equal to data stored");
     }
 
@@ -92,18 +86,16 @@ class MantaClientObjectIT extends PHPUnit_Framework_TestCase
     public function canOverwriteAnObject()
     {
         $data = "Plain-text test data";
-        $objectPath = sprintf("%s/%s.txt", self::$testDir, Uuid::uuid4());
+        $objectPath = sprintf("%s/%s.txt", self::$testDir, (string)Uuid::uuid4());
         $putResponse = self::$instance->putObject($data, $objectPath);
-        $this->assertArrayHasKey('headers', $putResponse, "Object not inserted: {$objectPath}");
+        $this->assertNotNull($putResponse->getHeaders(), "Object not inserted: {$objectPath}");
 
-        $objectResponse = self::$instance->getObjectAsString($objectPath);
-        $this->assertArrayHasKey('data', $objectResponse);
-        $objectContents = $objectResponse['data'];
+        $objectContents = self::$instance->getObjectAsString($objectPath);
         $this->assertEquals($data, $objectContents, "Remote object data is not equal to data stored");
 
         $updatedData = "Plain-text test data - updated";
         $wasUpdated = self::$instance->putObject($updatedData, $objectPath);
-        $this->assertArrayHasKey('headers', $wasUpdated, "Object not updated: {$objectPath}");
+        $this->assertNotNull($wasUpdated->getHeaders(), "Object not updated: {$objectPath}");
     }
 
     /** @test if we can properly write utf-8 data as read from a file into memory */
@@ -111,13 +103,11 @@ class MantaClientObjectIT extends PHPUnit_Framework_TestCase
     {
         $filePath = realpath(dirname(__FILE__));
         $data = file_get_contents("{$filePath}/../data/utf-8_file_contents.txt");
-        $objectPath = sprintf("%s/%s.txt", self::$testDir, Uuid::uuid4());
+        $objectPath = sprintf("%s/%s.txt", self::$testDir, (string)Uuid::uuid4());
         $putResponse = self::$instance->putObject($data, $objectPath);
-        $this->assertArrayHasKey('headers', $putResponse, "Object not inserted: {$objectPath}");
+        $this->assertNotNull($putResponse->getHeaders(), "Object not inserted: {$objectPath}");
 
-        $objectResponse = self::$instance->getObjectAsString($objectPath);
-        $this->assertArrayHasKey('data', $objectResponse);
-        $objectContents = $objectResponse['data'];
+        $objectContents = self::$instance->getObjectAsString($objectPath);
         $this->assertEquals($data, $objectContents, "Remote object data is not equal to data stored");
     }
 
@@ -129,11 +119,9 @@ class MantaClientObjectIT extends PHPUnit_Framework_TestCase
         $filename = rtrim(file_get_contents("{$filePath}/../data/utf-8_file_contents.txt"), "\n");
         $objectPath = sprintf("%s/%s.txt", self::$testDir, $filename);
         $putResponse = self::$instance->putObject($data, $objectPath);
-        $this->assertArrayHasKey('headers', $putResponse, "Object not inserted: {$objectPath}");
+        $this->assertNotNull($putResponse->getHeaders(), "Object not inserted: {$objectPath}");
 
-        $objectResponse = self::$instance->getObjectAsString($objectPath);
-        $this->assertArrayHasKey('data', $objectResponse);
-        $objectContents = $objectResponse['data'];
+        $objectContents = self::$instance->getObjectAsString($objectPath);
         $this->assertEquals($data, $objectContents, "Remote object data is not equal to data stored");
     }
 
@@ -141,9 +129,9 @@ class MantaClientObjectIT extends PHPUnit_Framework_TestCase
     public function canPutObjectAndGetAsFile()
     {
         $data = "Plain-text test data";
-        $objectPath = sprintf('%s/%s.txt', self::$testDir, Uuid::uuid4());
+        $objectPath = sprintf('%s/%s.txt', self::$testDir, (string)Uuid::uuid4());
         $putResponse = self::$instance->putObject($data, $objectPath);
-        $this->assertArrayHasKey('headers', $putResponse, "Object not inserted: {$objectPath}");
+        $this->assertNotNull($putResponse->getHeaders(), "Object not inserted: {$objectPath}");
 
         $objectResponse = self::$instance->getObjectAsFile($objectPath);
         $this->assertArrayHasKey('file', $objectResponse);
@@ -160,7 +148,7 @@ class MantaClientObjectIT extends PHPUnit_Framework_TestCase
     public function canPutAndDeleteObject()
     {
         $data = "Plain-text test data";
-        $objectPath = sprintf('%s/%s.txt', self::$testDir, Uuid::uuid4());
+        $objectPath = sprintf('%s/%s.txt', self::$testDir, (string)Uuid::uuid4());
         self::$instance->putObject($data, $objectPath);
         $this->assertTrue(self::$instance->exists($objectPath));
 
@@ -174,14 +162,14 @@ class MantaClientObjectIT extends PHPUnit_Framework_TestCase
     public function canCreateSnapLink()
     {
         $data = "Plain-text test data";
-        $objectPath = sprintf('%s/%s.txt', self::$testDir, Uuid::uuid4());
+        $objectPath = sprintf('%s/%s.txt', self::$testDir, (string)Uuid::uuid4());
         self::$instance->putObject($data, $objectPath);
         $this->assertTrue(self::$instance->exists($objectPath));
 
-        $linkPath = sprintf('%s/%s.txt', self::$testDir, Uuid::uuid4());
+        $linkPath = sprintf('%s/%s.txt', self::$testDir, (string)Uuid::uuid4());
 
         $response = self::$instance->putSnapLink($objectPath, $linkPath);
-        $this->assertArrayHasKey('headers', $response);
+        $this->assertNotNull($response->getHeaders(), "Object not inserted: {$objectPath}");
 
         $this->assertTrue(
             self::$instance->exists($linkPath),
@@ -190,7 +178,7 @@ class MantaClientObjectIT extends PHPUnit_Framework_TestCase
 
         $this->assertEquals(
             $data,
-            self::$instance->getObjectAsString($objectPath)['data'],
+            self::$instance->getObjectAsString($objectPath),
             "Snaplink data isn't identical"
         );
     }

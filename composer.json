@@ -33,11 +33,6 @@
   "autoload": {
     "psr-4": {
       "Joyent\\Manta\\": "src/"
-    },
-    "files": [
-      "src/MantaException.php",
-      "src/MantaJobPhase.php",
-      "src/MantaClient.php"
-    ]
+    }
   }
 }

@@ -18,7 +18,7 @@ class MantaClientJobIT extends PHPUnit_Framework_TestCase
         // Instantiate using environment variables
         self::$instance = new \Joyent\Manta\MantaClient();
         $account = getenv(\Joyent\Manta\MantaClient::MANTA_USER_ENV_KEY);
-        $prefix = Uuid::uuid4();
+        $prefix = (string)Uuid::uuid4();
         self::$baseDir = "/{$account}/stor/php-test/";
         self::$testDir = sprintf('%s/%s', self::$baseDir, $prefix);
 
@@ -35,7 +35,7 @@ class MantaClientJobIT extends PHPUnit_Framework_TestCase
 
     /** @test if we can create a job */
     public function canCreateAndCancelJob() {
-        $testId = Uuid::uuid4();
+        $testId = (string)Uuid::uuid4();
 
         $phases = array(
             array(
@@ -54,7 +54,7 @@ class MantaClientJobIT extends PHPUnit_Framework_TestCase
                 'We should get an id after creating a new job'
             );
             $this->assertNotEmpty($job['location']);
-            $this->assertNotEmpty($job['headers']);
+            $this->assertNotEmpty($job->getHeaders());
         } finally {
             self::$instance->cancelJob($job['jobId']);
         }
@@ -63,7 +63,7 @@ class MantaClientJobIT extends PHPUnit_Framework_TestCase
     /** @test if we can attach inputs to a job */
     public function canAttachInputsToJobAndRunJob()
     {
-        $testId = Uuid::uuid4();
+        $testId = (string)Uuid::uuid4();
 
         $objectPath = sprintf('%s/%s', self::$testDir, $testId);
         $data = <<<EOD
@@ -97,10 +97,10 @@ EOD;
 
         $inputs = array($objectPath);
         $added = self::$instance->addJobInputs($job['jobId'], $inputs);
-        $this->assertArrayHasKey('headers', $added, 'Inputs not attached');
+        $this->assertNotNull($added->getHeaders(), 'Inputs not attached');
 
         $ended = self::$instance->endJobInput($job['jobId']);
-        $this->assertArrayHasKey('headers', $ended, 'Job not ended');
+        $this->assertNotNull($ended->getHeaders(), 'Job not ended');
 
         $tries = 20;
         $state = 'running';
@@ -120,8 +120,8 @@ bb 3
 EOD;
 
         // This uses the live endpoint
-        $liveOutputPath = self::$instance->getJobLiveOutputs($job['jobId'])['data'][0];
-        $actualLiveOutput = self::$instance->getObjectAsString($liveOutputPath)['data'];
+        $liveOutputPath = self::$instance->getJobLiveOutputs($job['jobId'])[0];
+        $actualLiveOutput = self::$instance->getObjectAsString($liveOutputPath);
 
         $this->assertEquals(
             $expected,
@@ -130,8 +130,8 @@ EOD;
         );
 
         // This uses the endpoint that returns data for archived jobs
-        $outputPath = self::$instance->getJobOutputs($job['jobId'])['data'][0];
-        $actualOutput = self::$instance->getObjectAsString($outputPath)['data'];
+        $outputPath = self::$instance->getJobOutputs($job['jobId'])[0];
+        $actualOutput = self::$instance->getObjectAsString($outputPath);
 
         $this->assertEquals(
             $expected,
@@ -140,9 +140,9 @@ EOD;
         );
 
         // Verify that the job input was recorded successfully
-        $input = self::$instance->getJobInput($job['jobId'])['data'];
+        $input = self::$instance->getJobInput($job['jobId']);
         $inputPath = $input[0];
-        $actualInput = self::$instance->getObjectAsString($inputPath)['data'];
+        $actualInput = self::$instance->getObjectAsString($inputPath);
 
         $this->assertEquals(
             $data,
@@ -155,14 +155,14 @@ EOD;
     public function canListJobs()
     {
         $response = self::$instance->listJobs();
-        $this->assertArrayHasKey('headers', $response);
-        $this->assertArrayHasKey('data', $response);
+        $this->assertNotNull($response->getHeaders());
+        $this->assertFalse(empty($response), 'There should be at least job listed');
     }
 
     /** @test if we can list failed jobs */
     public function canGetFailedJobs()
     {
-        $testId = Uuid::uuid4();
+        $testId = (string)Uuid::uuid4();
 
         $objectPath = sprintf('%s/%s', self::$testDir, $testId);
         $data = <<<EOD
@@ -196,10 +196,10 @@ EOD;
 
         $inputs = array($objectPath);
         $added = self::$instance->addJobInputs($job['jobId'], $inputs);
-        $this->assertArrayHasKey('headers', $added, 'Inputs not attached');
+        $this->assertNotNull($added->getHeaders(), 'Inputs not attached');
 
         $ended = self::$instance->endJobInput($job['jobId']);
-        $this->assertArrayHasKey('headers', $ended, 'Job not ended');
+        $this->assertNotNull($ended->getHeaders(), 'Job not ended');
 
         $tries = 20;
         $state = 'running';
@@ -213,8 +213,8 @@ EOD;
 
         // Test live failures
 
-        $liveFailures = self::$instance->getLiveJobFailures($job['jobId'])['data'];
-        $actualFailureInput = self::$instance->getObjectAsString($liveFailures[0])['data'];
+        $liveFailures = self::$instance->getLiveJobFailures($job['jobId']);
+        $actualFailureInput = self::$instance->getObjectAsString($liveFailures[0]);
 
         $this->assertEquals(
             $data,
@@ -224,8 +224,8 @@ EOD;
 
         // Test archived failures
 
-        $failures = self::$instance->getJobFailures($job['jobId'])['data'];
-        $actualFailureInput = self::$instance->getObjectAsString($failures[0])['data'];
+        $failures = self::$instance->getJobFailures($job['jobId']);
+        $actualFailureInput = self::$instance->getObjectAsString($failures[0]);
 
         $this->assertEquals(
             $data,
@@ -235,7 +235,7 @@ EOD;
 
         // Test live error retrieval
 
-        $liveErrors = self::$instance->getLiveJobErrors($job['jobId'])['data'];
+        $liveErrors = self::$instance->getLiveJobErrors($job['jobId']);
 
         $this->assertEquals(
             'UserTaskError',
@@ -245,7 +245,7 @@ EOD;
 
         // Test archived error retrieval
 
-        $errors = self::$instance->getJobErrors($job['jobId'])['data'];
+        $errors = self::$instance->getJobErrors($job['jobId']);
 
         $this->assertEquals(
             'UserTaskError',
