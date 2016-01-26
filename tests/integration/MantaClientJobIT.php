@@ -141,6 +141,17 @@ EOD;
             $actualOutput,
             'Job output did not match expectation'
         );
+
+        // Verify that the job input was recorded successfully
+        $input = self::$instance->getJobInput($job['jobId'])['data'];
+        $inputPath = $input[0];
+        $actualInput = self::$instance->getObjectAsString($inputPath)['data'];
+
+        $this->assertEquals(
+            $data,
+            $actualInput,
+            'Input data stored on Manta did not match data sent to Manta'
+        );
     }
 
     /** @test if we can list jobs */
@@ -149,5 +160,17 @@ EOD;
         $response = self::$instance->listJobs();
         $this->assertArrayHasKey('headers', $response);
         $this->assertArrayHasKey('data', $response);
+    }
+
+    /** @test if we can list failed jobs */
+    public function canGetFailedJobs()
+    {
+
+    }
+
+    /** @test if we can get the errors messages jobs */
+    public function canGetJobErrors()
+    {
+
     }
 }

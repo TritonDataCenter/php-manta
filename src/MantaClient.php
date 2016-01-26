@@ -1000,17 +1000,19 @@ class MantaClient
     }
 
     /**
+     * Gets the input associated with a job.
+     *
      * @see http://apidocs.joyent.com/manta/api.html#GetJobInput
      * @since 2.0.0
      * @api
      *
-     * @param string $job_id    Job id returned by CreateJob
+     * @param  string $jobId Job id returned by CreateJob
      *
-     * @return array with 'headers' and 'data' elements where 'data' contains the list of input objects
+     * @return array         with 'headers' and 'data' elements where 'data' contains the list of input objects
      */
-    public function getJobInput($job_id)
+    public function getJobInput($jobId)
     {
-        $response = $this->execute('GET', "/{$this->login}/jobs/{$job_id}/live/in", null, null, true);
+        $response = $this->execute('GET', "/{$this->login}/jobs/{$jobId}/live/in", null, null, true);
 
         $headers = $response->getHeaders();
         $data = $this->parseTextList($response->getBody());
@@ -1028,9 +1030,9 @@ class MantaClient
      * @since 2.0.0
      * @api
      *
-     * @param  string $jobId    Job id returned by CreateJob
+     * @param  string $jobId Job id returned by CreateJob
      *
-     * @return array            with 'headers' and 'data' elements where 'data' contains the list of error objects
+     * @return array         with 'headers' and 'data' elements where 'data' contains the list of error objects
      */
     public function getJobFailures($jobId)
     {
@@ -1046,17 +1048,19 @@ class MantaClient
     }
 
     /**
+     * Gets the error messages associated with a job.
+     *
      * @see http://apidocs.joyent.com/manta/api.html#GetJobErrors
      * @since 2.0.0
      * @api
      *
-     * @param string $job_id    Job id returned by CreateJob
+     * @param  string $jobId Job id returned by CreateJob
      *
-     * @return array with 'headers' and 'data' elements where 'data' contains the errors
+     * @return array          with 'headers' and 'data' elements where 'data' contains the errors
      */
-    public function getJobErrors($job_id)
+    public function getJobErrors($jobId)
     {
-        $response = $this->execute('GET', "/{$this->login}/jobs/{$job_id}/live/err", null, null, true);
+        $response = $this->execute('GET', "/{$this->login}/jobs/{$jobId}/live/err", null, null, true);
 
 
         $headers = $response->getHeaders();
