@@ -883,6 +883,8 @@ class MantaClient
     }
 
     /**
+     * List all known jobs.
+     *
      * @see http://apidocs.joyent.com/manta/api.html#ListJobs
      * @since 2.0.0
      * @api
@@ -891,13 +893,15 @@ class MantaClient
      */
     public function listJobs()
     {
-        $retval = array();
-        $result = $this->execute('GET', "/{$this->login}/jobs", null, null, true);
+        $response = $this->execute('GET', "/{$this->login}/jobs", null, null, true);
 
-        $retval['headers'] = $result['headers'];
-        $retval['data'] = $this->parseJSONList($result['data']);
+        $headers = $response->getHeaders();
+        $data = $this->parseJSONList($response->getBody());
 
-        return $retval;
+        return array(
+            'headers' => $headers,
+            'data'    => $data
+        );
     }
 
     /**
@@ -1006,33 +1010,39 @@ class MantaClient
      */
     public function getJobInput($job_id)
     {
-        $retval = array();
-        $result = $this->execute('GET', "/{$this->login}/jobs/{$job_id}/live/in", null, null, true);
+        $response = $this->execute('GET', "/{$this->login}/jobs/{$job_id}/live/in", null, null, true);
 
-        $retval['headers'] = $result['headers'];
-        $retval['data'] = $this->parseTextList($result['data']);
+        $headers = $response->getHeaders();
+        $data = $this->parseTextList($response->getBody());
 
-        return $retval;
+        return array(
+            'headers' => $headers,
+            'data'    => $data
+        );
     }
 
     /**
+     * Lists all of the jobs in the 'failed' state.
+     *
      * @see http://apidocs.joyent.com/manta/api.html#GetJobFailures
      * @since 2.0.0
      * @api
      *
-     * @param string $job_id    Job id returned by CreateJob
+     * @param  string $jobId    Job id returned by CreateJob
      *
-     * @return array with 'headers' and 'data' elements where 'data' contains the list of error objects
+     * @return array            with 'headers' and 'data' elements where 'data' contains the list of error objects
      */
-    public function getJobFailures($job_id)
+    public function getJobFailures($jobId)
     {
-        $retval = array();
-        $result = $this->execute('GET', "/{$this->login}/jobs/{$job_id}/live/fail", null, null, true);
+        $response = $this->execute('GET', "/{$this->login}/jobs/{$jobId}/live/fail", null, null, true);
 
-        $retval['headers'] = $result['headers'];
-        $retval['data'] = $this->parseTextList($result['data']);
+        $headers = $response->getHeaders();
+        $data = $this->parseTextList($response->getBody());
 
-        return $retval;
+        return array(
+            'headers' => $headers,
+            'data'    => $data
+        );
     }
 
     /**
@@ -1046,12 +1056,15 @@ class MantaClient
      */
     public function getJobErrors($job_id)
     {
-        $retval = array();
-        $result = $this->execute('GET', "/{$this->login}/jobs/{$job_id}/live/err", null, null, true);
+        $response = $this->execute('GET', "/{$this->login}/jobs/{$job_id}/live/err", null, null, true);
 
-        $retval['headers'] = $result['headers'];
-        $retval['data'] = $this->parseJSONList($result['data']);
 
-        return $retval;
+        $headers = $response->getHeaders();
+        $data = $this->parseJSONList($response->getBody());
+
+        return array(
+            'headers' => $headers,
+            'data'    => $data
+        );
     }
 }

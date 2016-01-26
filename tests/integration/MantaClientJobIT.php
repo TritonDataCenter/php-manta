@@ -1,5 +1,7 @@
 <?php
 
+use Ramsey\Uuid\Uuid;
+
 class MantaClientJobIT extends PHPUnit_Framework_TestCase
 {
     /** @var string path to directory containing the test directory */
@@ -16,7 +18,7 @@ class MantaClientJobIT extends PHPUnit_Framework_TestCase
         // Instantiate using environment variables
         self::$instance = new \Joyent\Manta\MantaClient();
         $account = getenv(\Joyent\Manta\MantaClient::MANTA_USER_ENV_KEY);
-        $prefix = uniqid();
+        $prefix = Uuid::uuid4();
         self::$baseDir = "/{$account}/stor/php-test/";
         self::$testDir = sprintf('%s/%s', self::$baseDir, $prefix);
 
@@ -33,7 +35,7 @@ class MantaClientJobIT extends PHPUnit_Framework_TestCase
 
     /** @test if we can create a job */
     public function canCreateAndCancelJob() {
-        $testId = uniqid();
+        $testId = Uuid::uuid4();
 
         $phases = array(
             array(
@@ -61,7 +63,7 @@ class MantaClientJobIT extends PHPUnit_Framework_TestCase
     /** @test if we can attach inputs to a job */
     public function canAttachInputsToJobAndRunJob()
     {
-        $testId = uniqid();
+        $testId = Uuid::uuid4();
 
         $objectPath = sprintf('%s/%s', self::$testDir, $testId);
         $data = <<<EOD
@@ -127,6 +129,9 @@ EOD;
             'Job output did not match expectation'
         );
 
+        // We sleep for a moment because job archiving can sometimes get delayed
+        sleep(2);
+
         // This uses the endpoint that returns data for archived jobs
         $outputPath = self::$instance->getJobOutputs($job['jobId'])['data'][0];
         $actualOutput = self::$instance->getObjectAsString($outputPath)['data'];
@@ -136,5 +141,13 @@ EOD;
             $actualOutput,
             'Job output did not match expectation'
         );
+    }
+
+    /** @test if we can list jobs */
+    public function canListJobs()
+    {
+        $response = self::$instance->listJobs();
+        $this->assertArrayHasKey('headers', $response);
+        $this->assertArrayHasKey('data', $response);
     }
 }

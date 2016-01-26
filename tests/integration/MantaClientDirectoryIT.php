@@ -1,4 +1,7 @@
 <?php
+
+use Ramsey\Uuid\Uuid;
+
 class MantaClientDirectoryIT extends PHPUnit_Framework_TestCase
 {
     /** @var string path to directory containing the test directory */
@@ -15,7 +18,7 @@ class MantaClientDirectoryIT extends PHPUnit_Framework_TestCase
         // Instantiate using environment variables
         self::$instance = new \Joyent\Manta\MantaClient();
         $account = getenv(\Joyent\Manta\MantaClient::MANTA_USER_ENV_KEY);
-        $prefix = uniqid();
+        $prefix = Uuid::uuid4();
         self::$baseDir = "/{$account}/stor/php-test";
         self::$testDir = sprintf('%s/%s', self::$baseDir, $prefix);
 
@@ -33,7 +36,7 @@ class MantaClientDirectoryIT extends PHPUnit_Framework_TestCase
     /** @test if we can add a single directory */
     public function canCreateSingleDirectory()
     {
-        $dirPath = sprintf('%s/%s', self::$testDir, uniqid());
+        $dirPath = sprintf('%s/%s', self::$testDir, Uuid::uuid4());
 
         $this->assertFalse(
             self::$instance->exists($dirPath),
@@ -58,7 +61,7 @@ class MantaClientDirectoryIT extends PHPUnit_Framework_TestCase
     /** @test if we can overwrite an existing directory */
     public function canOverwriteSingleDirectory()
     {
-        $dirPath = sprintf('%s/%s', self::$testDir, uniqid());
+        $dirPath = sprintf('%s/%s', self::$testDir, Uuid::uuid4());
 
         $this->assertFalse(
             self::$instance->exists($dirPath),
@@ -89,9 +92,9 @@ class MantaClientDirectoryIT extends PHPUnit_Framework_TestCase
         $dirPath = sprintf(
             '%s/%s/%s/%s',
             self::$testDir,
-            uniqid(),
-            uniqid(),
-            uniqid()
+            Uuid::uuid4(),
+            Uuid::uuid4(),
+            Uuid::uuid4()
         );
 
         $this->assertFalse(
@@ -120,7 +123,7 @@ class MantaClientDirectoryIT extends PHPUnit_Framework_TestCase
     /** @test if we can delete a single directory */
     public function canDeleteSingleDirectory()
     {
-        $dirPath = sprintf('%s/%s', self::$testDir, uniqid());
+        $dirPath = sprintf('%s/%s', self::$testDir, Uuid::uuid4());
 
         $this->assertFalse(
             self::$instance->exists($dirPath),
@@ -155,16 +158,16 @@ class MantaClientDirectoryIT extends PHPUnit_Framework_TestCase
         $basePath = sprintf(
             '%s/%s',
             self::$testDir,
-            uniqid()
+            Uuid::uuid4()
         );
 
 
         $dirPath = sprintf(
             '%s/%s/%s/%s',
             $basePath,
-            uniqid(),
-            uniqid(),
-            uniqid()
+            Uuid::uuid4(),
+            Uuid::uuid4(),
+            Uuid::uuid4()
         );
 
         $this->assertFalse(
@@ -194,13 +197,13 @@ class MantaClientDirectoryIT extends PHPUnit_Framework_TestCase
 
     /** @test if we can list directory contents */
     public function canListDirectoryContents() {
-        $dirPath = sprintf('%s/%s', self::$testDir, uniqid());
+        $dirPath = sprintf('%s/%s', self::$testDir, Uuid::uuid4());
 
         self::$instance->putDirectory($dirPath);
 
-        $object1Name = uniqid();
-        $object2Name = uniqid();
-        $object3Name = uniqid();
+        $object1Name = Uuid::uuid4();
+        $object2Name = Uuid::uuid4();
+        $object3Name = Uuid::uuid4();
 
         $object1Path = sprintf('%s/%s', $dirPath, $object1Name);
         $object2Path = sprintf('%s/%s', $dirPath, $object2Name);

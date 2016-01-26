@@ -1,4 +1,7 @@
 <?php
+
+use Ramsey\Uuid\Uuid;
+
 class MantaClientObjectIT extends PHPUnit_Framework_TestCase
 {
     /** @var string path to directory containing the test directory */
@@ -15,7 +18,7 @@ class MantaClientObjectIT extends PHPUnit_Framework_TestCase
         // Instantiate using environment variables
         self::$instance = new \Joyent\Manta\MantaClient();
         $account = getenv(\Joyent\Manta\MantaClient::MANTA_USER_ENV_KEY);
-        $prefix = uniqid();
+        $prefix = Uuid::uuid4();
         self::$baseDir = "/{$account}/stor/php-test/";
         self::$testDir = sprintf('%s/%s', self::$baseDir, $prefix);
 
@@ -34,7 +37,7 @@ class MantaClientObjectIT extends PHPUnit_Framework_TestCase
     public function canPutObjectFromStringAnAndGetIt()
     {
         $data = "Plain-text test data";
-        $objectPath = sprintf('%s/%s.txt', self::$testDir, uniqid());
+        $objectPath = sprintf('%s/%s.txt', self::$testDir, Uuid::uuid4());
         $putResponse = self::$instance->putObject($data, $objectPath);
         $this->assertArrayHasKey('headers', $putResponse, "Object not inserted: {$objectPath}");
 
@@ -52,7 +55,7 @@ class MantaClientObjectIT extends PHPUnit_Framework_TestCase
 
         try
         {
-            $objectPath = sprintf('%s/%s.txt', self::$testDir, uniqid());
+            $objectPath = sprintf('%s/%s.txt', self::$testDir, Uuid::uuid4());
             $putResponse = self::$instance->putObject($file, $objectPath);
             $this->assertArrayHasKey('headers', $putResponse, "Object not inserted: {$objectPath}");
 
@@ -75,7 +78,7 @@ class MantaClientObjectIT extends PHPUnit_Framework_TestCase
     {
         $actualObject = "I'm a stream...";
         $stream = GuzzleHttp\Psr7\stream_for($actualObject);
-        $objectPath = sprintf('%s/%s.txt', self::$testDir, uniqid());
+        $objectPath = sprintf('%s/%s.txt', self::$testDir, Uuid::uuid4());
         $putResponse = self::$instance->putObject($stream, $objectPath);
         $this->assertArrayHasKey('headers', $putResponse, "Object not inserted: {$objectPath}");
 
@@ -89,7 +92,7 @@ class MantaClientObjectIT extends PHPUnit_Framework_TestCase
     public function canOverwriteAnObject()
     {
         $data = "Plain-text test data";
-        $objectPath = sprintf("%s/%s.txt", self::$testDir, uniqid());
+        $objectPath = sprintf("%s/%s.txt", self::$testDir, Uuid::uuid4());
         $putResponse = self::$instance->putObject($data, $objectPath);
         $this->assertArrayHasKey('headers', $putResponse, "Object not inserted: {$objectPath}");
 
@@ -108,7 +111,7 @@ class MantaClientObjectIT extends PHPUnit_Framework_TestCase
     {
         $filePath = realpath(dirname(__FILE__));
         $data = file_get_contents("{$filePath}/../data/utf-8_file_contents.txt");
-        $objectPath = sprintf("%s/%s.txt", self::$testDir, uniqid());
+        $objectPath = sprintf("%s/%s.txt", self::$testDir, Uuid::uuid4());
         $putResponse = self::$instance->putObject($data, $objectPath);
         $this->assertArrayHasKey('headers', $putResponse, "Object not inserted: {$objectPath}");
 
@@ -138,7 +141,7 @@ class MantaClientObjectIT extends PHPUnit_Framework_TestCase
     public function canPutObjectAndGetAsFile()
     {
         $data = "Plain-text test data";
-        $objectPath = sprintf('%s/%s.txt', self::$testDir, uniqid());
+        $objectPath = sprintf('%s/%s.txt', self::$testDir, Uuid::uuid4());
         $putResponse = self::$instance->putObject($data, $objectPath);
         $this->assertArrayHasKey('headers', $putResponse, "Object not inserted: {$objectPath}");
 
@@ -157,7 +160,7 @@ class MantaClientObjectIT extends PHPUnit_Framework_TestCase
     public function canPutAndDeleteObject()
     {
         $data = "Plain-text test data";
-        $objectPath = sprintf('%s/%s.txt', self::$testDir, uniqid());
+        $objectPath = sprintf('%s/%s.txt', self::$testDir, Uuid::uuid4());
         self::$instance->putObject($data, $objectPath);
         $this->assertTrue(self::$instance->exists($objectPath));
 
@@ -171,11 +174,11 @@ class MantaClientObjectIT extends PHPUnit_Framework_TestCase
     public function canCreateSnapLink()
     {
         $data = "Plain-text test data";
-        $objectPath = sprintf('%s/%s.txt', self::$testDir, uniqid());
+        $objectPath = sprintf('%s/%s.txt', self::$testDir, Uuid::uuid4());
         self::$instance->putObject($data, $objectPath);
         $this->assertTrue(self::$instance->exists($objectPath));
 
-        $linkPath = sprintf('%s/%s.txt', self::$testDir, uniqid());
+        $linkPath = sprintf('%s/%s.txt', self::$testDir, Uuid::uuid4());
 
         $response = self::$instance->putSnapLink($objectPath, $linkPath);
         $this->assertArrayHasKey('headers', $response);
