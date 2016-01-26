@@ -105,7 +105,7 @@ EOD;
         $tries = 20;
         $state = 'running';
 
-        for ($try = 0; $try < $tries && $state != 'done'; $try++) {
+        for ($try = 0; $try < $tries && $state == 'running'; $try++) {
             sleep(2);
             $state = self::$instance->getJobState($job['jobId']);
         }
@@ -128,9 +128,6 @@ EOD;
             $actualLiveOutput,
             'Job output did not match expectation'
         );
-
-        // We sleep for a moment because job archiving can sometimes get delayed
-        sleep(2);
 
         // This uses the endpoint that returns data for archived jobs
         $outputPath = self::$instance->getJobOutputs($job['jobId'])['data'][0];
@@ -165,12 +162,95 @@ EOD;
     /** @test if we can list failed jobs */
     public function canGetFailedJobs()
     {
+        $testId = Uuid::uuid4();
 
-    }
+        $objectPath = sprintf('%s/%s', self::$testDir, $testId);
+        $data = <<<EOD
+exclude me
+bb 1
+another ignored line
+bb 2
+also ignore this
+bb 3
+bb 3
+EOD;
 
-    /** @test if we can get the errors messages jobs */
-    public function canGetJobErrors()
-    {
+        self::$instance->putObject($data, $objectPath);
 
+        $this->assertTrue(self::$instance->exists($objectPath));
+
+        $phases = array(
+            array(
+                'type' => 'map',
+                'exec' => "grep foo"
+            ),
+            array(
+                'type' => 'reduce',
+                'exec' => 'sort | uniq'
+            )
+        );
+
+        $name = "php-manta-test-failed-job-{$testId}";
+
+        $job = self::$instance->createJob($phases, $name);
+
+        $inputs = array($objectPath);
+        $added = self::$instance->addJobInputs($job['jobId'], $inputs);
+        $this->assertArrayHasKey('headers', $added, 'Inputs not attached');
+
+        $ended = self::$instance->endJobInput($job['jobId']);
+        $this->assertArrayHasKey('headers', $ended, 'Job not ended');
+
+        $tries = 20;
+        $state = 'running';
+
+        for ($try = 0; $try < $tries && $state == 'running'; $try++) {
+            sleep(2);
+            $state = self::$instance->getJobState($job['jobId']);
+        }
+
+        $this->assertEquals('done', $state, 'Job state should be done');
+
+        // Test live failures
+
+        $liveFailures = self::$instance->getLiveJobFailures($job['jobId'])['data'];
+        $actualFailureInput = self::$instance->getObjectAsString($liveFailures[0])['data'];
+
+        $this->assertEquals(
+            $data,
+            $actualFailureInput,
+            "Live failing input stored on Manta should equal input sent to Manta"
+        );
+
+        // Test archived failures
+
+        $failures = self::$instance->getJobFailures($job['jobId'])['data'];
+        $actualFailureInput = self::$instance->getObjectAsString($failures[0])['data'];
+
+        $this->assertEquals(
+            $data,
+            $actualFailureInput,
+            "Failing input stored on Manta should equal input sent to Manta"
+        );
+
+        // Test live error retrieval
+
+        $liveErrors = self::$instance->getLiveJobErrors($job['jobId'])['data'];
+
+        $this->assertEquals(
+            'UserTaskError',
+            $liveErrors[0]['code'],
+            'Error code did not match expectation'
+        );
+
+        // Test archived error retrieval
+
+        $errors = self::$instance->getJobErrors($job['jobId'])['data'];
+
+        $this->assertEquals(
+            'UserTaskError',
+            $errors[0]['code'],
+            'Error code did not match expectation'
+        );
     }
 }

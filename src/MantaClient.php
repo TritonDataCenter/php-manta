@@ -1024,7 +1024,9 @@ class MantaClient
     }
 
     /**
-     * Lists all of the jobs in the 'failed' state.
+     * Returns the current "live" set of failures from a job. This method is
+     * intended for getting information about the progress of a running job
+     * rather than getting a comprehensive list of all of the outputs.
      *
      * @see http://apidocs.joyent.com/manta/api.html#GetJobFailures
      * @since 2.0.0
@@ -1034,7 +1036,7 @@ class MantaClient
      *
      * @return array         with 'headers' and 'data' elements where 'data' contains the list of error objects
      */
-    public function getJobFailures($jobId)
+    public function getLiveJobFailures($jobId)
     {
         $response = $this->execute('GET', "/{$this->login}/jobs/{$jobId}/live/fail", null, null, true);
 
@@ -1048,19 +1050,72 @@ class MantaClient
     }
 
     /**
-     * Gets the error messages associated with a job.
+     * Returns a set of failures from a job. This method is method should be
+     * preferred over the "live" method for use with jobs that have completed.
      *
-     * @see http://apidocs.joyent.com/manta/api.html#GetJobErrors
+     * @see http://apidocs.joyent.com/manta/api.html#GetObject
      * @since 2.0.0
      * @api
      *
      * @param  string $jobId Job id returned by CreateJob
      *
+     * @return array         with 'headers' and 'data' elements where 'data' contains the list of error objects
+     */
+    public function getJobFailures($jobId)
+    {
+        $response = $this->execute('GET', "/{$this->login}/jobs/{$jobId}/fail.txt", null, null, true);
+
+        $headers = $response->getHeaders();
+        $data = $this->parseTextList($response->getBody());
+
+        return array(
+            'headers' => $headers,
+            'data'    => $data
+        );
+    }
+
+    /**
+     * Returns the current "live" set of errors from a job. This method is
+     * intended for getting information about the progress of a running job
+     * rather than getting a comprehensive list of all of the outputs.
+     *
+     * @see http://apidocs.joyent.com/manta/api.html#GetJobErrors
+     * @since 2.0.0
+     * @api
+     *
+     * @param  string $jobId  Job id returned by CreateJob
+     *
+     * @return array          with 'headers' and 'data' elements where 'data' contains the errors
+     */
+    public function getLiveJobErrors($jobId)
+    {
+        $response = $this->execute('GET', "/{$this->login}/jobs/{$jobId}/live/err", null, null, true);
+
+
+        $headers = $response->getHeaders();
+        $data = $this->parseJSONList($response->getBody());
+
+        return array(
+            'headers' => $headers,
+            'data'    => $data
+        );
+    }
+
+    /**
+     * Returns a set of errors from a job. This method is method should be
+     * preferred over the "live" method for use with jobs that have completed.
+     *
+     * @see http://apidocs.joyent.com/manta/api.html#GetObject
+     * @since 2.0.0
+     * @api
+     *
+     * @param  string $jobId  Job id returned by CreateJob
+     *
      * @return array          with 'headers' and 'data' elements where 'data' contains the errors
      */
     public function getJobErrors($jobId)
     {
-        $response = $this->execute('GET', "/{$this->login}/jobs/{$jobId}/live/err", null, null, true);
+        $response = $this->execute('GET', "/{$this->login}/jobs/{$jobId}/err.txt", null, null, true);
 
 
         $headers = $response->getHeaders();
