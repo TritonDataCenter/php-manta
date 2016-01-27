@@ -434,7 +434,7 @@ class MantaClient
                 }
 
                 $result = $this->execute('PUT', $directoryTree, $headers);
-                $resultHeaders->addHeaders($result->getHeaders());
+                $resultHeaders->addHeaderToAllHeaders($result->getHeaders());
             }
         } else {
             $result = $this->execute('PUT', $directory, $headers);
@@ -530,40 +530,31 @@ class MantaClient
      * @since 2.0.0
      * @api
      *
-     * @param  string  $directory   Name of directory
-     * @param  boolean $recursive   Recurse down directory wiping all children
+     * @param  string  $directory       Name of directory
+     * @param  boolean $recursive       Recurse down directory wiping all children
      *
-     * @return array                array of request header values
+     * @return MantaHeaderMultiResponse HTTP response object
      */
     public function deleteDirectory($directory, $recursive = false)
     {
-        $results = array();
-
+        $results = new MantaHeaderMultiResponse();
 
         if ($recursive) {
             $items = $this->listDirectory($directory);
 
-            $results['all_headers'] = array();
+            $results = new MantaHeaderMultiResponse();
 
             foreach ($items as $item) {
                 if (!empty($item['type'])) {
-                    /** @var Response|null $response */
+                    /** @var MantaHeaderResponse|MantaHeaderMultiResponse|null $response */
                     $response = null;
 
                     if ('directory' == $item['type']) {
                         $response = $this->deleteDirectory("{$directory}/{$item['name']}", true);
+                        $results->mergeHeadersToAllHeaders($response->getAllHeaders());
                     } elseif ('object' == $item['type']) {
                         $response = $this->deleteObject("{$directory}/{$item['name']}");
-                    }
-
-                    if (is_null($response)) {
-                        continue;
-                    }
-
-                    if (array_key_exists('headers', $response)) {
-                        $results['all_headers'][] = $response['headers'];
-                    } else if (array_key_exists('all_headers', $response)) {
-                        $results['all_headers'] = array_merge($results['all_headers'], $response['all_headers']);
+                        $results->addHeaderToAllHeaders($response->getHeaders());
                     }
                 }
             }
@@ -571,11 +562,8 @@ class MantaClient
 
         $response = $this->execute('DELETE', $directory);
 
-        if (array_key_exists('all_headers', $results)) {
-            $results['all_headers'][] = $response->getHeaders();
-        } else {
-            $results['headers'] = $response->getHeaders();
-        }
+        $results->addHeaderToAllHeaders($response->getHeaders());
+        $results->setHeaders($response->getHeaders());
 
         return $results;
     }
@@ -659,18 +647,19 @@ class MantaClient
      * @since 2.0.0
      * @api
      *
-     * @param string $object        Path of object
+     * @param  string $object Path of object
      *
-     * @return array with 'headers' and 'data' elements
+     * @return MantaStreamResponse HTTP response object that wraps stream
      */
     public function getObjectAsStream($object)
     {
         $response = $this->execute('GET', $object, null, null, true);
 
-        return array(
-            'headers' => $response->getHeaders(),
-            'stream' => $response->getBody()
-        );
+        $headers = $response->getHeaders();
+        $stream = $response->getBody();
+
+        // Object compatible with StreamInterface
+        return new MantaStreamResponse($stream, $headers);
     }
 
     /**
@@ -684,15 +673,14 @@ class MantaClient
      * @since 2.0.0
      * @api
      *
-     * @param string $object        Path of object
+     * @param  string $object             Path of object
      *
-     * @return array with 'headers' and 'file' elements
+     * @return string|MantaStringResponse Path to file where data is stored
      */
     public function getObjectAsFile($object) {
-        $results = $this->getObjectAsStream($object);
-        $headers = $results['headers'];
-        /** @var StreamInterface $stream stream of Manta object contents */
-        $stream = $results['stream'];
+        $stream = $this->getObjectAsStream($object);
+        $headers = $stream->getHeaders();
+
         $input = StreamWrapper::getResource($stream);
         $tempDir = sys_get_temp_dir();
         $filePath = tempnam ($tempDir, 'manta-php-');
@@ -711,10 +699,7 @@ class MantaClient
             $stream->close();
         }
 
-        return array(
-            'headers' => $headers,
-            'file' => $filePath
-        );
+        return new MantaStringResponse($filePath, $headers);
     }
 
     /**

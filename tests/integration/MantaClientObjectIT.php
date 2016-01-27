@@ -133,9 +133,8 @@ class MantaClientObjectIT extends PHPUnit_Framework_TestCase
         $putResponse = self::$instance->putObject($data, $objectPath);
         $this->assertNotNull($putResponse->getHeaders(), "Object not inserted: {$objectPath}");
 
-        $objectResponse = self::$instance->getObjectAsFile($objectPath);
-        $this->assertArrayHasKey('file', $objectResponse);
-        $file = $objectResponse['file'];
+        $file = self::$instance->getObjectAsFile($objectPath);
+
         try {
             $objectContents = file_get_contents($file);
             $this->assertEquals($data, $objectContents, "Remote object data is not equal to data stored");

@@ -129,6 +129,9 @@ EOD;
             'Job output did not match expectation'
         );
 
+        // Sleep because there may be a delay moving jobs into the archived state
+        sleep(2);
+
         // This uses the endpoint that returns data for archived jobs
         $outputPath = self::$instance->getJobOutputs($job['jobId'])[0];
         $actualOutput = self::$instance->getObjectAsString($outputPath);
@@ -221,6 +224,9 @@ EOD;
             $actualFailureInput,
             "Live failing input stored on Manta should equal input sent to Manta"
         );
+
+        // Sleep because there may be a delay moving jobs into the archived state
+        sleep(2);
 
         // Test archived failures
 

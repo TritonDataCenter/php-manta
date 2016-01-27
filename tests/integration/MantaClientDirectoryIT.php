@@ -52,7 +52,7 @@ class MantaClientDirectoryIT extends PHPUnit_Framework_TestCase
 
         $dir = self::$instance->getObjectAsStream($dirPath);
         $this->assertEquals(
-            $dir['headers']['Content-Type'][0],
+            $dir->getHeaders()['Content-Type'][0],
             'application/x-json-stream; type=directory',
             "Wrong content type for directory"
         );
@@ -77,7 +77,7 @@ class MantaClientDirectoryIT extends PHPUnit_Framework_TestCase
 
         $dir = self::$instance->getObjectAsStream($dirPath);
         $this->assertEquals(
-            $dir['headers']['Content-Type'][0],
+            $dir->getHeaders()['Content-Type'][0],
             'application/x-json-stream; type=directory',
             "Wrong content type for directory"
         );
@@ -114,7 +114,7 @@ class MantaClientDirectoryIT extends PHPUnit_Framework_TestCase
 
         $dir = self::$instance->getObjectAsStream($dirPath);
         $this->assertEquals(
-            $dir['headers']['Content-Type'][0],
+            $dir->getHeaders()['Content-Type'][0],
             'application/x-json-stream; type=directory',
             "Wrong content type for directory"
         );
@@ -139,7 +139,7 @@ class MantaClientDirectoryIT extends PHPUnit_Framework_TestCase
 
         $dir = self::$instance->getObjectAsStream($dirPath);
         $this->assertEquals(
-            $dir['headers']['Content-Type'][0],
+            $dir->getHeaders()['Content-Type'][0],
             'application/x-json-stream; type=directory',
             "Wrong content type for directory"
         );
@@ -186,7 +186,7 @@ class MantaClientDirectoryIT extends PHPUnit_Framework_TestCase
 
         $this->assertEquals(
             4,
-            count($response['all_headers']),
+            count($response->getAllHeaders()),
             'The expected number of response headers were not found');
 
         $this->assertFalse(
