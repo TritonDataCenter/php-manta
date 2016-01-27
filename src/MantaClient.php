@@ -5,8 +5,10 @@
  */
 
 use GuzzleHttp\Client;
+use GuzzleHttp\Exception\RequestException;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Middleware;
+use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
 use GuzzleHttp\Psr7\StreamWrapper;
 use Psr\Http\Message\RequestInterface;
@@ -40,6 +42,8 @@ class MantaClient
     const MANTA_TLS_INSECURE_KEY = 'MANTA_TLS_INSECURE';
     /** Environment variable indicating to turn off HTTPS authentication. */
     const MANTA_NO_AUTH_KEY = 'MANTA_NO_AUTH';
+    /** Environment variable indicating the number of times to retry requests */
+    const MANTA_HTTP_RETRIES_KEY = 'MANTA_HTTP_RETRIES';
 
     /** Default value for Manta REST endpoint. */
     const DEFAULT_MANTA_URL = 'https://us-east.manta.joyent.com:443';
@@ -51,6 +55,8 @@ class MantaClient
     const DEFAULT_TIMEOUT = 20.0;
     /** Default HTTP handler class. */
     const DEFAULT_HTTP_HANDLER = 'GuzzleHttp\Handler\StreamHandler';
+    /** Default number of times to retry failed requests */
+    const DEFAULT_RETRIES = 3;
 
     /** Maximum number of bytes to read from private key file. */
     const MAXIMUM_PRIV_KEY_SIZE = 51200;
@@ -77,6 +83,8 @@ class MantaClient
     protected $insecureTlsKey = null;
     /** @var null|boolean Flag indicating that authentication is disabled  */
     protected $noAuth = null;
+    /** @var null|integer number of times to retry */
+    protected $retries = null;
     /** @var null|Client HTTP client instance  */
     protected $client = null;
 
@@ -106,7 +114,8 @@ class MantaClient
         $timeout = null,
         $handler = null,
         $insecureTlsKey = null,
-        $noAuth = null
+        $noAuth = null,
+        $retries = null
     ) {
         $this->endpoint = self::paramEnvOrDefault(
             $endpoint,
@@ -162,15 +171,6 @@ class MantaClient
             "timeout"
         );
 
-        $handlerClass = self::paramEnvOrDefault(
-            $handler,
-            self::MANTA_HTTP_HANDLER_KEY,
-            self::DEFAULT_HTTP_HANDLER,
-            "handler"
-        );
-
-        $this->handlerStack = $this->buildHandlerStack($handlerClass);
-
         $verifyTlsKeyValue = self::paramEnvOrDefault(
             $insecureTlsKey,
             self::MANTA_TLS_INSECURE_KEY,
@@ -188,6 +188,22 @@ class MantaClient
             "noauth"
         );
 
+        $this->retries = self::paramEnvOrDefault(
+            $retries,
+            self::MANTA_HTTP_RETRIES_KEY,
+            self::DEFAULT_RETRIES,
+            "retries"
+        );
+
+        // Build the middleware configuration once, so we don't have to do it each call
+        $handlerClass = self::paramEnvOrDefault(
+            $handler,
+            self::MANTA_HTTP_HANDLER_KEY,
+            self::DEFAULT_HTTP_HANDLER,
+            "handler"
+        );
+
+        $this->handlerStack = $this->buildHandlerStack($handlerClass);
 
         // Build the HTTP client once, so that we don't have to do it each call
         $this->client = $this->buildHttpClient();
@@ -198,7 +214,7 @@ class MantaClient
      * the passed value, the associated environment variable's value or the
      * default value for a given parameter.
      *
-     * @param  string|array|float|boolean|null
+     * @param  string|array|float|integer|boolean|null
      *                           $argValue the value from the constructor's parameter
      * @param  string|null       $envKey   the name of the associated environment variable
      * @param  string|array|float|boolean|null
@@ -261,6 +277,36 @@ class MantaClient
 
             return $requestInterface;
         }));
+
+        $decider = function (
+            $retries,
+            Request $request,
+            Response $response = null,
+            RequestException $exception = null
+        ) {
+            // Stop retrying if we have exceeded our max
+            if ($retries > $this->retries) {
+                return false;
+            }
+
+            // Retry connection exceptions
+            if ($exception instanceof ConnectException) {
+                return true;
+            }
+
+            if ($response) {
+                // Retry on server errors
+                if ($response->getStatusCode() >= 500) {
+                    return true;
+                }
+            }
+
+            return false;
+        };
+
+        if ($this->retries > 0) {
+            $stack->push(Middleware::retry($decider));
+        }
 
         return $stack;
     }
