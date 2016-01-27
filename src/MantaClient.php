@@ -6,6 +6,7 @@
  */
 
 use GuzzleHttp\Client;
+use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Exception\RequestException;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Middleware;
@@ -477,7 +478,7 @@ class MantaClient
     /**
      * Determines if a given object or directory exists in Manta.
      *
-     * @param $path object path to check
+     * @param string $path object path to check
      * @return boolean TRUE if object exists, otherwise FALSE
      */
     public function exists($path)

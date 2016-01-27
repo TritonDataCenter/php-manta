@@ -1,6 +1,7 @@
 <?php namespace Joyent\Manta;
 
 use Ramsey\Uuid\Uuid;
+use GuzzleHttp\Psr7;
 
 class MantaClientObjectIT extends \PHPUnit_Framework_TestCase
 {
@@ -72,7 +73,7 @@ class MantaClientObjectIT extends \PHPUnit_Framework_TestCase
     public function canPutObjectFromStreamAnAndGetIt()
     {
         $actualObject = "I'm a stream...";
-        $stream = GuzzleHttp\Psr7\stream_for($actualObject);
+        $stream = Psr7\stream_for($actualObject);
         $objectPath = sprintf('%s/%s.txt', self::$testDir, (string)Uuid::uuid4());
         $putResponse = self::$instance->putObject($stream, $objectPath);
         $this->assertNotNull($putResponse->getHeaders(), "Object not inserted: {$objectPath}");
@@ -162,7 +163,7 @@ class MantaClientObjectIT extends \PHPUnit_Framework_TestCase
     {
         $data = "Plain-text test data [async]";
         $objectPath = sprintf('%s/%s.txt', self::$testDir, (string)Uuid::uuid4());
-        $promise = self::$instance->putObjectAsync($data, $objectPath);
+        self::$instance->putObjectAsync($data, $objectPath);
 
         $tries = 20;
 
