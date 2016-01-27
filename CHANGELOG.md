@@ -9,6 +9,8 @@ This project adheres to [Semantic Versioning](http://semver.org/).
  - Added support for Manta environment variables.
  - Added unit tests.
  - Added explicit exception class - MantaException.
+ - Added additional methods.
+ - Added examples.
  
 ### Changed
  - Moved existing project from bitbucket to github.
@@ -22,3 +24,5 @@ This project adheres to [Semantic Versioning](http://semver.org/).
  - Minimum PHP version is now 5.6.
  - Switched client HTTP library from libcurl to guzzle.
  - Changed get method to getObjectAs* (getObjectAsString, getObjectAsStream, getObjectAsFile)
+ - Wrapped all responses in response objects rather than arrays so that we can
+   work with the response results without extracting properties.

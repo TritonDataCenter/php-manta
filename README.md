@@ -27,6 +27,11 @@ environment variables and their defaults.
 | GuzzleHttp\Handler\StreamHandler     | MANTA_HTTP_HANDLER        |
 | false                                | MANTA_NO_AUTH             |
 
+## Usage
+
+For usage examples, see the directory `examples` for some sample scripts that
+use the API.
+
 ## Contributing
 We are seeking active contributors right now. Pull requests are welcome.
 
