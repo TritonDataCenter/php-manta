@@ -4,14 +4,14 @@
  * the public or the private cloud.
  */
 
-use Ramsey\Uuid\Uuid;
+use GuzzleHttp\Client;
+use GuzzleHttp\HandlerStack;
+use GuzzleHttp\Middleware;
 use GuzzleHttp\Psr7\Response;
 use GuzzleHttp\Psr7\StreamWrapper;
 use Psr\Http\Message\RequestInterface;
-use GuzzleHttp\HandlerStack;
-use GuzzleHttp\Client;
-use GuzzleHttp\Middleware;
 use Psr\Http\Message\StreamInterface;
+use Ramsey\Uuid\Uuid;
 
 /**
  * Manta client class for interacting with the Manta REST API service endpoint.
@@ -38,6 +38,8 @@ class MantaClient
     const MANTA_TIMEOUT_KEY = 'MANTA_TIMEOUT';
     /** Environment variable indicating to turn off TLS key verification. */
     const MANTA_TLS_INSECURE_KEY = 'MANTA_TLS_INSECURE';
+    /** Environment variable indicating to turn off HTTPS authentication. */
+    const MANTA_NO_AUTH_KEY = 'MANTA_NO_AUTH';
 
     /** Default value for Manta REST endpoint. */
     const DEFAULT_MANTA_URL = 'https://us-east.manta.joyent.com:443';
@@ -73,6 +75,8 @@ class MantaClient
     protected $handlerStack = null;
     /** @var null|boolean Flag indicating if we should validate TLS keys  */
     protected $insecureTlsKey = null;
+    /** @var null|boolean Flag indicating that authentication is disabled  */
+    protected $noAuth = null;
     /** @var null|Client HTTP client instance  */
     protected $client = null;
 
@@ -90,7 +94,8 @@ class MantaClient
      * @param string|null  algo                Algorithm to use for signatures; valid values are RSA-SHA1, RSA-SHA256, DSA-SHA
      * @param float|null   timeout             Float describing the timeout of the request in seconds. Use 0 to wait indefinitely (the default behavior)
      * @param string|null  handler             Name of the Guzzle handler class to use for making HTTP calls (e.g. GuzzleHttp\Handler\CurlHandler)
-     * @param boolean|null insecureTlsKey       When true we don't verify TLS keys
+     * @param boolean|null insecureTlsKey      When true we don't verify TLS keys
+     * @param boolean|null noAuth              When true we disable HTTP authentication
      */
     public function __construct(
         $endpoint = null,
@@ -100,7 +105,8 @@ class MantaClient
         $algo = null,
         $timeout = null,
         $handler = null,
-        $insecureTlsKey = null
+        $insecureTlsKey = null,
+        $noAuth = null
     ) {
         $this->endpoint = self::paramEnvOrDefault(
             $endpoint,
@@ -175,6 +181,14 @@ class MantaClient
         // Value passed to us may have been an integer
         $this->insecureTlsKey = (boolean)$verifyTlsKeyValue;
 
+        $this->noAuth = self::paramEnvOrDefault(
+            $noAuth,
+            self::MANTA_NO_AUTH_KEY,
+            false,
+            "noauth"
+        );
+
+
         // Build the HTTP client once, so that we don't have to do it each call
         $this->client = $this->buildHttpClient();
     }
@@ -234,10 +248,18 @@ class MantaClient
             $timestamp = gmdate('r');
             $authorization = $this->getAuthorization($timestamp);
 
-            return $request
+            $requestInterface = $request
                 ->withHeader('Date', $timestamp)
-                ->withHeader('Authorization', $authorization)
                 ->withHeader('x-request-id', (string)Uuid::uuid4());
+
+            if (!$this->noAuth) {
+                $requestInterface = $requestInterface->withHeader(
+                    'Authorization',
+                    $authorization
+                );
+            }
+
+            return $requestInterface;
         }));
 
         return $stack;
