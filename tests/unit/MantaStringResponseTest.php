@@ -1,8 +1,8 @@
-<?php
+<?php namespace Joyent\Manta;
 
 use Ramsey\Uuid\Uuid;
 
-class MantaStringResponseTest extends PHPUnit_Framework_TestCase
+class MantaStringResponseTest extends \PHPUnit_Framework_TestCase
 {
     /** @test if we can access a response as a string */
     public function canAccessAsString()
@@ -37,9 +37,9 @@ class MantaStringResponseTest extends PHPUnit_Framework_TestCase
     protected static function headers()
     {
         return array(
-            'Content-Type'   => 'text/plain',
+            'Content-Type' => 'text/plain',
             'Content-Length' => 5,
-            'x-request-id'   => (string)Uuid::uuid4()
+            'x-request-id' => (string)Uuid::uuid4()
         );
     }
 }

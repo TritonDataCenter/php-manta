@@ -64,7 +64,7 @@ class MantaStringResponse implements MantaResponse, \ArrayAccess
     {
         if ($offset == 'data') {
             return $this->string;
-        } else if ($offset == 'headers') {
+        } elseif ($offset == 'headers') {
             return $this->headers;
         }
 

@@ -29,7 +29,8 @@ class MantaException extends \Exception
                     '[%s] %s (%s)',
                     $this->serverCode,
                     $this->serverMessage,
-                    $this->requestId);
+                    $this->requestId
+                );
             } catch (\Exception $e) {
                 // Ignore any errors, we just let $details stay null
             }

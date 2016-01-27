@@ -1,8 +1,8 @@
-<?php
+<?php namespace Joyent\Manta;
 
 use Ramsey\Uuid\Uuid;
 
-class MantaClientObjectIT extends PHPUnit_Framework_TestCase
+class MantaClientObjectIT extends \PHPUnit_Framework_TestCase
 {
     /** @var string path to directory containing the test directory */
     private static $baseDir;
@@ -14,10 +14,11 @@ class MantaClientObjectIT extends PHPUnit_Framework_TestCase
     private static $instance;
 
     /** @beforeClass setup client instance and create test directory */
-    public static function setUpInstance() {
+    public static function setUpInstance()
+    {
         // Instantiate using environment variables
-        self::$instance = new \Joyent\Manta\MantaClient();
-        $account = getenv(\Joyent\Manta\MantaClient::MANTA_USER_ENV_KEY);
+        self::$instance = new MantaClient();
+        $account = getenv(MantaClient::MANTA_USER_ENV_KEY);
         $prefix = (string)Uuid::uuid4();
         self::$baseDir = "/{$account}/stor/php-test/";
         self::$testDir = sprintf('%s/%s', self::$baseDir, $prefix);
@@ -27,7 +28,8 @@ class MantaClientObjectIT extends PHPUnit_Framework_TestCase
     }
 
     /** @afterClass clean up any test files */
-    public static function cleanUp() {
+    public static function cleanUp()
+    {
         if (self::$instance) {
             self::$instance->deleteDirectory(self::$testDir, true);
         }
@@ -51,8 +53,7 @@ class MantaClientObjectIT extends PHPUnit_Framework_TestCase
         $filePath = realpath(dirname(__FILE__));
         $file = fopen("{$filePath}/../data/binary_file", 'r');
 
-        try
-        {
+        try {
             $objectPath = sprintf('%s/%s.txt', self::$testDir, (string)Uuid::uuid4());
             $putResponse = self::$instance->putObject($file, $objectPath);
             $this->assertNotNull($putResponse->getHeaders(), "Object not inserted: {$objectPath}");
@@ -60,10 +61,8 @@ class MantaClientObjectIT extends PHPUnit_Framework_TestCase
             $objectContents = self::$instance->getObjectAsString($objectPath);
             $actualContents = file_get_contents("{$filePath}/../data/binary_file", 'r');
             $this->assertEquals($actualContents, $objectContents, "Remote object data is not equal to data stored");
-        } finally
-        {
-            if (is_resource($file))
-            {
+        } finally {
+            if (is_resource($file)) {
                 fclose($file);
             }
         }
@@ -154,7 +153,8 @@ class MantaClientObjectIT extends PHPUnit_Framework_TestCase
         self::$instance->deleteObject($objectPath);
         $this->assertFalse(
             self::$instance->exists($objectPath),
-            "Object wasn't deleted: {$objectPath}");
+            "Object wasn't deleted: {$objectPath}"
+        );
     }
 
     /** @test if we can delete an object */
@@ -175,7 +175,8 @@ class MantaClientObjectIT extends PHPUnit_Framework_TestCase
         self::$instance->deleteObject($objectPath);
         $this->assertFalse(
             self::$instance->exists($objectPath),
-            "Object wasn't deleted: {$objectPath}");
+            "Object wasn't deleted: {$objectPath}"
+        );
     }
 
     /** @test if we can create a snaplink */

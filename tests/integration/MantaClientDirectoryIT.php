@@ -1,8 +1,8 @@
-<?php
+<?php namespace Joyent\Manta;
 
 use Ramsey\Uuid\Uuid;
 
-class MantaClientDirectoryIT extends PHPUnit_Framework_TestCase
+class MantaClientDirectoryIT extends \PHPUnit_Framework_TestCase
 {
     /** @var string path to directory containing the test directory */
     private static $baseDir;
@@ -14,10 +14,11 @@ class MantaClientDirectoryIT extends PHPUnit_Framework_TestCase
     private static $instance;
 
     /** @beforeClass setup client instance and create test directory */
-    public static function setUpInstance() {
+    public static function setUpInstance()
+    {
         // Instantiate using environment variables
-        self::$instance = new \Joyent\Manta\MantaClient();
-        $account = getenv(\Joyent\Manta\MantaClient::MANTA_USER_ENV_KEY);
+        self::$instance = new MantaClient();
+        $account = getenv(MantaClient::MANTA_USER_ENV_KEY);
         $prefix = (string)Uuid::uuid4();
         self::$baseDir = "/{$account}/stor/php-test";
         self::$testDir = sprintf('%s/%s', self::$baseDir, $prefix);
@@ -27,7 +28,8 @@ class MantaClientDirectoryIT extends PHPUnit_Framework_TestCase
     }
 
     /** @afterClass clean up any test files */
-    public static function cleanUp() {
+    public static function cleanUp()
+    {
         if (self::$instance) {
             self::$instance->deleteDirectory(self::$testDir, true);
         }
@@ -109,8 +111,11 @@ class MantaClientDirectoryIT extends PHPUnit_Framework_TestCase
             "Directory path should exist: {$dirPath}"
         );
 
-        $this->assertEquals(count($response->getAllHeaders()), 6,
-            "An unexpected number of header results were returned");
+        $this->assertEquals(
+            count($response->getAllHeaders()),
+            6,
+            "An unexpected number of header results were returned"
+        );
 
         $dir = self::$instance->getObjectAsStream($dirPath);
         $this->assertEquals(
@@ -187,7 +192,8 @@ class MantaClientDirectoryIT extends PHPUnit_Framework_TestCase
         $this->assertEquals(
             4,
             count($response->getAllHeaders()),
-            'The expected number of response headers were not found');
+            'The expected number of response headers were not found'
+        );
 
         $this->assertFalse(
             self::$instance->exists($basePath),
@@ -196,7 +202,8 @@ class MantaClientDirectoryIT extends PHPUnit_Framework_TestCase
     }
 
     /** @test if we can list directory contents */
-    public function canListDirectoryContents() {
+    public function canListDirectoryContents()
+    {
         $dirPath = sprintf('%s/%s', self::$testDir, (string)Uuid::uuid4());
 
         self::$instance->putDirectory($dirPath);
@@ -216,9 +223,10 @@ class MantaClientDirectoryIT extends PHPUnit_Framework_TestCase
 
         $contents = (array)self::$instance->listDirectory($dirPath);
 
-        $nameMatcher = function($name)
-        {
-            return function ($item) use ($name) { return $item['name'] == $name; };
+        $nameMatcher = function ($name) {
+            return function ($item) use ($name) {
+                return $item['name'] == $name;
+            };
         };
 
         $foundObject1 = array_filter($contents, $nameMatcher($object1Name));

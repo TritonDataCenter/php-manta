@@ -1,5 +1,6 @@
-<?php
-class MantaClientTest extends PHPUnit_Framework_TestCase
+<?php namespace Joyent\Manta;
+
+class MantaClientTest extends \PHPUnit_Framework_TestCase
 {
     /** @test if a new instance can be created */
     public function canCreateNewInstanceFromEnvVars()

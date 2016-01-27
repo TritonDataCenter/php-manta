@@ -1,4 +1,5 @@
 <?php namespace Joyent\Manta;
+
 /**
  * This is a library for accessing the Joyent Manta Services via
  * the public or the private cloud.
@@ -96,13 +97,18 @@ class MantaClient
      * @since 2.0.0
      * @api
      *
-     * @param string|null  endpoint            Manta endpoint to use for requests (e.g. https://us-east.manta.joyent.com)
+     * @param string|null  endpoint            Manta endpoint to use for requests
+     *                                         (e.g. https://us-east.manta.joyent.com)
      * @param string|null  login               Manta login
      * @param string|null  keyid               Manta keyid
      * @param string|null  privateKeyContents  Client SSH private key
-     * @param string|null  algo                Algorithm to use for signatures; valid values are RSA-SHA1, RSA-SHA256, DSA-SHA
-     * @param float|null   timeout             Float describing the timeout of the request in seconds. Use 0 to wait indefinitely (the default behavior)
-     * @param string|null  handler             Name of the Guzzle handler class to use for making HTTP calls (e.g. GuzzleHttp\Handler\CurlHandler)
+     * @param string|null  algo                Algorithm to use for signatures; valid values are
+     *                                         RSA-SHA1, RSA-SHA256, DSA-SHA
+     * @param float|null   timeout             Float describing the timeout of the request in
+     *                                         seconds. Use 0 to wait indefinitely
+     *                                         (the default behavior)
+     * @param string|null  handler             Name of the Guzzle handler class to use for making
+     *                                         HTTP calls (e.g. GuzzleHttp\Handler\CurlHandler)
      * @param boolean|null insecureTlsKey      When true we don't verify TLS keys
      * @param boolean|null noAuth              When true we disable HTTP authentication
      */
@@ -317,7 +323,8 @@ class MantaClient
      *
      * @return Client configured HTTP client
      */
-    protected function buildHttpClient() {
+    protected function buildHttpClient()
+    {
         $params = [
             'base_uri' => $this->endpoint,
             'timeout'  => $this->timeout,
@@ -342,7 +349,7 @@ class MantaClient
         $pkeyid = openssl_get_privatekey($this->privateKeyContents);
         $sig = '';
         $dateString = sprintf('date: %s', $timestamp);
-        openssl_sign($dateString , $sig, $pkeyid, $this->algo);
+        openssl_sign($dateString, $sig, $pkeyid, $this->algo);
         $sig = base64_encode($sig);
         $algo = strtolower($this->algo);
 
@@ -408,11 +415,9 @@ class MantaClient
         if ($throwErrorOnFailure && $res->getStatusCode() > 399) {
             $jsonDetail = null;
 
-            try
-            {
+            try {
                 $jsonDetail = (string)$res->getBody();
-            } catch (\Exception $e)
-            {
+            } catch (\Exception $e) {
                 // Do nothing. If we can't get the details, then we just pass null
             }
 
@@ -420,7 +425,8 @@ class MantaClient
                 $res->getReasonPhrase(),
                 $res->getStatusCode(),
                 $res->getHeaderLine('x-request-id'),
-                $jsonDetail);
+                $jsonDetail
+            );
         }
 
         return $res;
@@ -557,7 +563,7 @@ class MantaClient
             return false;
         }
 
-        for($i = 1; $i < $length; $i++) {
+        for ($i = 1; $i < $length; $i++) {
             if (substr($directory, $i, 1) == '/') {
                 $count++;
 
@@ -589,8 +595,7 @@ class MantaClient
         $response = $this->execute('GET', $directory, $headers, null, true);
         $body = $response->getBody();
 
-        try
-        {
+        try {
             $responseJson = (string)$body;
             $data = $this->parseJSONList($responseJson);
 
@@ -747,14 +752,12 @@ class MantaClient
         $response = $this->execute('GET', $object, null, null, true);
         $body = $response->getBody();
 
-        try
-        {
+        try {
             return new MantaStringResponse(
                 (string)$body,
                 $response->getHeaders()
             );
-        } finally
-        {
+        } finally {
             $body->close();
         }
     }
@@ -798,13 +801,14 @@ class MantaClient
      *
      * @return string|MantaStringResponse Path to file where data is stored
      */
-    public function getObjectAsFile($object) {
+    public function getObjectAsFile($object)
+    {
         $stream = $this->getObjectAsStream($object);
         $headers = $stream->getHeaders();
 
         $input = StreamWrapper::getResource($stream);
         $tempDir = sys_get_temp_dir();
-        $filePath = tempnam ($tempDir, 'manta-php-');
+        $filePath = tempnam($tempDir, 'manta-php-');
         $file = fopen($filePath, 'w');
 
         try {

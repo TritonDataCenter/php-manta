@@ -48,7 +48,8 @@ class MantaObjectResponse extends \stdClass implements MantaResponse
         return $this->object;
     }
 
-    public function __call($method, $args) {
+    public function __call($method, $args)
+    {
         // wrap all calls to this object
         return call_user_func_array(array($this->object, $method), $args);
     }

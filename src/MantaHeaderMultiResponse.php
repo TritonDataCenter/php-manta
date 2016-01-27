@@ -39,7 +39,8 @@ class MantaHeaderMultiResponse extends MantaHeaderResponse
      *
      * @param array $headers headers to add to allHeaders property
      */
-    public function addHeaderToAllHeaders(array $headers) {
+    public function addHeaderToAllHeaders(array $headers)
+    {
         $this->allHeaders[] = $headers;
     }
 
@@ -47,7 +48,8 @@ class MantaHeaderMultiResponse extends MantaHeaderResponse
      * Merge array of headers into allHeaders
      * @param array $headers array of arrays of headers
      */
-    public function mergeHeadersToAllHeaders(array $headers) {
+    public function mergeHeadersToAllHeaders(array $headers)
+    {
         $this->allHeaders = array_merge($this->allHeaders, $headers);
     }
 }

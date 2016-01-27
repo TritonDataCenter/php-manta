@@ -94,5 +94,4 @@ class MantaStreamResponse extends MantaObjectResponse implements StreamInterface
     {
         return $this->object->getMetadata($key);
     }
-
 }

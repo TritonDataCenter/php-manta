@@ -1,8 +1,8 @@
-<?php
+<?php namespace Joyent\Manta;
 
 use Ramsey\Uuid\Uuid;
 
-class MantaClientJobIT extends PHPUnit_Framework_TestCase
+class MantaClientJobIT extends \PHPUnit_Framework_TestCase
 {
     /** @var string path to directory containing the test directory */
     private static $baseDir;
@@ -14,10 +14,11 @@ class MantaClientJobIT extends PHPUnit_Framework_TestCase
     private static $instance;
 
     /** @beforeClass setup client instance and create test directory */
-    public static function setUpInstance() {
+    public static function setUpInstance()
+    {
         // Instantiate using environment variables
-        self::$instance = new \Joyent\Manta\MantaClient();
-        $account = getenv(\Joyent\Manta\MantaClient::MANTA_USER_ENV_KEY);
+        self::$instance = new MantaClient();
+        $account = getenv(MantaClient::MANTA_USER_ENV_KEY);
         $prefix = (string)Uuid::uuid4();
         self::$baseDir = "/{$account}/stor/php-test/";
         self::$testDir = sprintf('%s/%s', self::$baseDir, $prefix);
@@ -27,14 +28,16 @@ class MantaClientJobIT extends PHPUnit_Framework_TestCase
     }
 
     /** @afterClass clean up any test files */
-    public static function cleanUp() {
+    public static function cleanUp()
+    {
         if (self::$instance) {
             self::$instance->deleteDirectory(self::$testDir, true);
         }
     }
 
     /** @test if we can create a job */
-    public function canCreateAndCancelJob() {
+    public function canCreateAndCancelJob()
+    {
         $testId = (string)Uuid::uuid4();
 
         $phases = array(
