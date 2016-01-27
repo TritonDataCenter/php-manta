@@ -8,6 +8,7 @@ use GuzzleHttp\Client;
 use GuzzleHttp\Exception\RequestException;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Middleware;
+use GuzzleHttp\Promise\Promise;
 use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
 use GuzzleHttp\Psr7\StreamWrapper;
@@ -357,8 +358,10 @@ class MantaClient
      * @param  string|resource|StreamInterface
      *                  $data                Data to send with PUT or POST requests
      * @param  boolean  $throwErrorOnFailure When set to true, HTTP response codes greater
+     * @param  boolean  $async               Asynchronously execute request when true
      *                                       than 299 will trigger a MantaException
-     * @return Response $result              HTTP response object
+     * @return Response|Promise
+     *                  $result              HTTP response object
      * @throws MantaException                thrown when we have an IO issue with the network
      */
     protected function execute(
@@ -366,7 +369,8 @@ class MantaClient
         $path,
         $headers = array(),
         $data = null,
-        $throwErrorOnFailure = true
+        $throwErrorOnFailure = true,
+        $async = false
     ) {
         // Make sure that the path is in valid UTF-8
         mb_check_encoding($path, 'UTF-8');
@@ -379,7 +383,8 @@ class MantaClient
             'connect_timeout' => $this->timeout,
             'verify'          => !$this->insecureTlsKey,
             // we have our own error handling logic, so we don't need this done for us
-            'http_errors'     => false
+            'http_errors'     => false,
+            'synchronous'     => !$async
         ];
 
         $proxy = getenv('http_proxy');
@@ -392,7 +397,13 @@ class MantaClient
             $options['body'] = $data;
         }
 
-        $res = $this->client->request($method, $withLeadingSlash, $options);
+        $asyncRes = $this->client->requestAsync($method, $withLeadingSlash, $options);
+
+        if ($async) {
+            return $asyncRes;
+        }
+
+        $res = $asyncRes->wait();
 
         if ($throwErrorOnFailure && $res->getStatusCode() > 399) {
             $jsonDetail = null;
@@ -675,6 +686,48 @@ class MantaClient
         $response = $this->execute('PUT', $object, $headers, $data);
 
         return new MantaHeaderResponse($response->getHeaders());
+    }
+
+    /**
+     * Method identical to the putObject method, but supporting an asynchronous
+     * operation, so that you don't have to wait for transmission to complete.
+     *
+     * Creates or overwrites an object. You specify the path to an object just
+     * as you would on a traditional file system, and the parent must be a
+     * directory. The service will do no interpretation of your data.
+     * Specifically, that means your data is treated as an opaque byte stream,
+     * and you will receive back exactly what you upload.
+     *
+     * By default, The service will store two copies of your data on two
+     * physical servers in two different datacenters; note that each physical
+     * server is configured with RAID-Z, so a disk drive failure does not
+     * impact your durability or availability. You can increase (or decrease)
+     * the number of copies of your object with the durability-level header.
+     *
+     * You should always specify a Content-Type header, which will be stored
+     * and returned back (HTTP content-negotiation will be handled). If you
+     * do not specify one, the default is application/octet-stream.
+     *
+     * @see http://apidocs.joyent.com/manta/api.html#PutObject
+     * @since 2.0.0
+     * @api
+     *
+     * @param  string|resource|StreamInterface
+     *                             Data to store on Manta
+     * @param  string $object      Name of object
+     * @param  array  $headers     Additional headers; see documentation for valid values
+     *
+     * @return Promise             Guzzle promise object
+     */
+    public function putObjectAsync($data, $object, $headers = array())
+    {
+        if (is_string($data)) {
+            $headers['Content-MD5'] = base64_encode(md5($data, true));
+        }
+
+        // TODO: Figure out how to performantly handle MD5's for streams
+
+        return $this->execute('PUT', $object, $headers, $data, true, true);
     }
 
     /**

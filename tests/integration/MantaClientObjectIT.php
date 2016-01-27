@@ -157,6 +157,27 @@ class MantaClientObjectIT extends PHPUnit_Framework_TestCase
             "Object wasn't deleted: {$objectPath}");
     }
 
+    /** @test if we can delete an object */
+    public function canPutAsyncAndDeleteObject()
+    {
+        $data = "Plain-text test data [async]";
+        $objectPath = sprintf('%s/%s.txt', self::$testDir, (string)Uuid::uuid4());
+        $promise = self::$instance->putObjectAsync($data, $objectPath);
+
+        $tries = 20;
+
+        for ($try = 0; $try < $tries && !self::$instance->exists($objectPath); $try++) {
+            sleep(2);
+        }
+
+        $this->assertTrue(self::$instance->exists($objectPath));
+
+        self::$instance->deleteObject($objectPath);
+        $this->assertFalse(
+            self::$instance->exists($objectPath),
+            "Object wasn't deleted: {$objectPath}");
+    }
+
     /** @test if we can create a snaplink */
     public function canCreateSnapLink()
     {
