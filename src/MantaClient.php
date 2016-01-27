@@ -408,10 +408,10 @@ class MantaClient
      * @since 2.0.0
      * @api
      *
-     * @param  string  $directory      Name of directory
-     * @param  boolean $make_parents   Ensure parent directories exist
+     * @param  string  $directory       Name of directory
+     * @param  boolean $make_parents    Ensure parent directories exist
      *
-     * @return array                   array of request header values
+     * @return MantaHeaderMultiResponse HTTP response object
      */
     public function putDirectory($directory, $make_parents = false)
     {
@@ -419,13 +419,12 @@ class MantaClient
             'Content-Type' => 'application/json; type=directory'
         );
 
-        $resultHeaders = array();
+        $resultHeaders = new MantaHeaderMultiResponse();
+        $result = null;
 
         if ($make_parents) {
             $parents = explode('/', $directory);
             $directoryTree = '';
-
-            $resultHeaders['all_headers'] = array();
 
             foreach ($parents as $parent) {
                 $directoryTree .= $parent . '/';
@@ -435,12 +434,13 @@ class MantaClient
                 }
 
                 $result = $this->execute('PUT', $directoryTree, $headers);
-                $resultHeaders['all_headers'][] = $result->getHeaders();
+                $resultHeaders->addHeaders($result->getHeaders());
             }
         } else {
             $result = $this->execute('PUT', $directory, $headers);
-            $resultHeaders['headers'] = $result->getHeaders();
         }
+
+        $resultHeaders->setHeaders($result->getHeaders());
 
         return $resultHeaders;
     }

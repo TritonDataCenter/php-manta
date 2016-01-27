@@ -109,7 +109,7 @@ class MantaClientDirectoryIT extends PHPUnit_Framework_TestCase
             "Directory path should exist: {$dirPath}"
         );
 
-        $this->assertEquals(count($response['all_headers']), 6,
+        $this->assertEquals(count($response->getAllHeaders()), 6,
             "An unexpected number of header results were returned");
 
         $dir = self::$instance->getObjectAsStream($dirPath);

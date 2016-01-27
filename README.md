@@ -11,6 +11,7 @@ We are seeking active contributors right now. Pull requests are welcome.
 ## Required PHP Framework Features
  * [OpenSSL](http://php.net/manual/en/openssl.installation.php)
  * [JSON](http://php.net/manual/en/json.installation.php) - Installed by default in newest versions
+ * PHP 5.6+ or HHVM
 
 ## Credits
 Kudos to the original author of php-manta - [Robert Bates](https://twitter.com/arpieb). He developed the library 

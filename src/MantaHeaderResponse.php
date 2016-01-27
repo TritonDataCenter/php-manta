@@ -31,4 +31,12 @@ class MantaHeaderResponse implements MantaResponse
     {
         return $this->headers;
     }
+
+    /**
+     * @param array $headers set the headers property to the specified value
+     */
+    public function setHeaders($headers)
+    {
+        $this->headers = $headers;
+    }
 }
