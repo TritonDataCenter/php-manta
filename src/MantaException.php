@@ -2,9 +2,13 @@
 
 class MantaException extends \Exception
 {
+    /** @var integer HTTP error number */
     public $serverCode;
+    /** @var string error message from Manta */
     public $serverMessage;
+    /** @var string unique request id used for debugging */
     public $requestId;
+    /** @var null|string path associated with error */
     public $path;
 
     /**
@@ -21,8 +25,8 @@ class MantaException extends \Exception
         $errorNo,
         $requestId,
         $path = null,
-        $jsonDetails = null)
-    {
+        $jsonDetails = null
+    ) {
         $details = null;
 
         if (!empty($jsonDetails)) {

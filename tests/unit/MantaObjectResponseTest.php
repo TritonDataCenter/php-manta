@@ -41,6 +41,7 @@ class MantaObjectResponseTest extends \PHPUnit_Framework_TestCase
     }
 }
 
+// @codingStandardsIgnoreStart
 class FooObject extends \stdClass
 {
     public function hello()
@@ -53,3 +54,4 @@ class FooObject extends \stdClass
         return 'hello';
     }
 }
+// @codingStandardsIgnoreEnd

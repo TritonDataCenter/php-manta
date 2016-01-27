@@ -271,7 +271,8 @@ class MantaClientDirectoryIT extends \PHPUnit_Framework_TestCase
     }
 
     /** @test if we can get a directory's metadata */
-    public function canGetDirectoryMetadata() {
+    public function canGetDirectoryMetadata()
+    {
         $dirPath = sprintf('%s/%s', self::$testDir, (string)Uuid::uuid4());
         self::$instance->putDirectory($dirPath);
 

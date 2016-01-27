@@ -208,7 +208,8 @@ class MantaClientObjectIT extends \PHPUnit_Framework_TestCase
     }
 
     /** @test if we can get an objects's metadata */
-    public function canGetObjectMetadata() {
+    public function canGetObjectMetadata()
+    {
         $data = "Plain-text test data";
         $objectPath = sprintf('%s/%s.txt', self::$testDir, (string)Uuid::uuid4());
         self::$instance->putObject($data, $objectPath);
