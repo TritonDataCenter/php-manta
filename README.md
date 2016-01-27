@@ -2,6 +2,7 @@
 
 [php-manta](http://joyent.github.com/php-manta) is a community-maintained PHP SDK for interacting with Joyent's 
 Manta system.
+[![Build Status](https://travis-ci.org/joyent/php-manta.svg?branch=travis)](https://travis-ci.org/joyent/php-manta)
 
 [![MPL licensed](https://img.shields.io/badge/license-MPL_2.0-blue.svg)](https://github.com/joyent/php-manta/blob/master/LICENSE)
 
