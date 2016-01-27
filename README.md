@@ -16,21 +16,34 @@ Php-manta can be configured using its constructor or by passing nulls and lettin
 environment variables and defaults configure the client. Here's a list of available
 environment variables and their defaults.
 
-| Default                              | Environment Variable      |
-|--------------------------------------|---------------------------|
-| https://us-east.manta.joyent.com:443 | MANTA_URL                 |
-|                                      | MANTA_USER                |
-|                                      | MANTA_KEY_ID              |
-| $home/.ssh/id_rsa                    | MANTA_KEY_PATH            |
-| 20                                   | MANTA_TIMEOUT             |
-| 3                                    | MANTA_HTTP_RETRIES        |
-| GuzzleHttp\Handler\StreamHandler     | MANTA_HTTP_HANDLER        |
-| false                                | MANTA_NO_AUTH             |
+| Default                              | Environment Variable      | Description                                 |
+|--------------------------------------|---------------------------|---------------------------------------------|
+| https://us-east.manta.joyent.com:443 | MANTA_URL                 | URL to access Manta                         |
+|                                      | MANTA_USER                | User account                                |
+|                                      | MANTA_SUBUSER             | Subuser account                             |
+|                                      | MANTA_KEY_ID              | RSA fingerprint id                          |
+| $home/.ssh/id_rsa                    | MANTA_KEY_PATH            | Path to RSA key                             |
+| 20                                   | MANTA_TIMEOUT             | Timeout in seconds before failing a request | 
+| 3                                    | MANTA_HTTP_RETRIES        | Times to retry failed requests              |
+| GuzzleHttp\Handler\StreamHandler     | MANTA_HTTP_HANDLER        | PHP HTTP implementation name                | 
+| false                                | MANTA_NO_AUTH             | Disables authentication                     |
 
 ## Usage
 
 For usage examples, see the directory `examples` for some sample scripts that
 use the API.
+
+## Subuser Difficulties
+
+A common problem with subusers is that you haven't granted the subuser access to the
+path within Manta. Typically this is done via the [Manta CLI Tools](https://apidocs.joyent.com/manta/commands-reference.html)
+using the [`mchmod` command](https://github.com/joyent/node-manta/blob/master/docs/man/mchmod.md).
+
+For example:
+
+```bash
+mchmod +subusername /user/stor/my_directory
+```
 
 ## Contributing
 We are seeking active contributors right now. Pull requests are welcome.

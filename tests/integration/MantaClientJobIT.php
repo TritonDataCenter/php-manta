@@ -66,6 +66,10 @@ class MantaClientJobIT extends \PHPUnit_Framework_TestCase
     /** @test if we can attach inputs to a job */
     public function canAttachInputsToJobAndRunJob()
     {
+        if (!empty(self::$instance->getSubuser())) {
+            $this->markTestSkipped('Skipping. This operation isn\'t supported by subusers');
+        }
+
         $testId = (string)Uuid::uuid4();
 
         $objectPath = sprintf('%s/%s', self::$testDir, $testId);
@@ -168,6 +172,10 @@ EOD;
     /** @test if we can list failed jobs */
     public function canGetFailedJobs()
     {
+        if (!empty(self::$instance->getSubuser())) {
+            $this->markTestSkipped('Skipping. This operation isn\'t supported by subusers');
+        }
+
         $testId = (string)Uuid::uuid4();
 
         $objectPath = sprintf('%s/%s', self::$testDir, $testId);

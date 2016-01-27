@@ -33,20 +33,22 @@ class MantaClient
     const MANTA_URL_ENV_KEY = 'MANTA_URL';
     /** Environment variable for Manta account name. */
     const MANTA_USER_ENV_KEY = 'MANTA_USER';
+    /** Environment variable for Manta subuser name. */
+    const MANTA_SUBUSER_ENV_KEY = 'MANTA_SUBUSER';
     /** Environment variable for private encryption key fingerprint. */
     const MANTA_KEY_ID_ENV_KEY = "MANTA_KEY_ID";
     /** Environment variable indicating the path to the private key. */
     const MANTA_KEY_PATH_ENV_KEY = 'MANTA_KEY_PATH';
     /** Environment variable indicating the HTTP handler implementation. */
-    const MANTA_HTTP_HANDLER_KEY = 'MANTA_HTTP_HANDLER';
+    const MANTA_HTTP_HANDLER_ENV_KEY = 'MANTA_HTTP_HANDLER';
     /** Environment variable indicating the timeout for HTTP requests. */
-    const MANTA_TIMEOUT_KEY = 'MANTA_TIMEOUT';
+    const MANTA_TIMEOUT_ENV_KEY = 'MANTA_TIMEOUT';
     /** Environment variable indicating to turn off TLS key verification. */
-    const MANTA_TLS_INSECURE_KEY = 'MANTA_TLS_INSECURE';
+    const MANTA_TLS_INSECURE_ENV_KEY = 'MANTA_TLS_INSECURE';
     /** Environment variable indicating to turn off HTTPS authentication. */
-    const MANTA_NO_AUTH_KEY = 'MANTA_NO_AUTH';
+    const MANTA_NO_AUTH_ENV_KEY = 'MANTA_NO_AUTH';
     /** Environment variable indicating the number of times to retry requests */
-    const MANTA_HTTP_RETRIES_KEY = 'MANTA_HTTP_RETRIES';
+    const MANTA_HTTP_RETRIES_ENV_KEY = 'MANTA_HTTP_RETRIES';
 
     /** Default value for Manta REST endpoint. */
     const DEFAULT_MANTA_URL = 'https://us-east.manta.joyent.com:443';
@@ -72,8 +74,10 @@ class MantaClient
 
     /** @var null|string Root endpoint to make HTTP requests against */
     protected $endpoint = null;
-    /** @var null|string  Manta primary account name */
-    protected $login = null;
+    /** @var null|string Manta primary account name */
+    protected $account = null;
+    /** @var null|string Subuser name */
+    protected $subuser = null;
     /** @var null|string RSA key fingerprint */
     protected $keyid = null;
     /** @var null|string HTTP signature algorithm name*/
@@ -102,7 +106,8 @@ class MantaClient
      *
      * @param string|null  endpoint            Manta endpoint to use for requests
      *                                         (e.g. https://us-east.manta.joyent.com)
-     * @param string|null  login               Manta login
+     * @param string|null  account             Manta account name
+     * @param string|null  subuser             Manta subuser name
      * @param string|null  keyid               Manta keyid
      * @param string|null  privateKeyContents  Client SSH private key
      * @param string|null  algo                Algorithm to use for signatures; valid values are
@@ -117,7 +122,8 @@ class MantaClient
      */
     public function __construct(
         $endpoint = null,
-        $login = null,
+        $account = null,
+        $subuser = null,
         $keyid = null,
         $privateKeyContents = null,
         $algo = null,
@@ -134,11 +140,19 @@ class MantaClient
             "endpoint"
         );
 
-        $this->login = self::paramEnvOrDefault(
-            $login,
+        $this->account = self::paramEnvOrDefault(
+            $account,
             self::MANTA_USER_ENV_KEY,
             null,
             "login"
+        );
+
+        $this->subuser = self::paramEnvOrDefault(
+            $subuser,
+            self::MANTA_SUBUSER_ENV_KEY,
+            null,
+            "subuser",
+            true
         );
 
         $this->keyid = self::paramEnvOrDefault(
@@ -176,14 +190,14 @@ class MantaClient
 
         $this->timeout = self::paramEnvOrDefault(
             $timeout,
-            self::MANTA_TIMEOUT_KEY,
+            self::MANTA_TIMEOUT_ENV_KEY,
             self::DEFAULT_TIMEOUT,
             "timeout"
         );
 
         $verifyTlsKeyValue = self::paramEnvOrDefault(
             $insecureTlsKey,
-            self::MANTA_TLS_INSECURE_KEY,
+            self::MANTA_TLS_INSECURE_ENV_KEY,
             false,
             "verify TLS key"
         );
@@ -193,14 +207,14 @@ class MantaClient
 
         $this->noAuth = self::paramEnvOrDefault(
             $noAuth,
-            self::MANTA_NO_AUTH_KEY,
+            self::MANTA_NO_AUTH_ENV_KEY,
             false,
             "noauth"
         );
 
         $this->retries = self::paramEnvOrDefault(
             $retries,
-            self::MANTA_HTTP_RETRIES_KEY,
+            self::MANTA_HTTP_RETRIES_ENV_KEY,
             self::DEFAULT_RETRIES,
             "retries"
         );
@@ -208,7 +222,7 @@ class MantaClient
         // Build the middleware configuration once, so we don't have to do it each call
         $handlerClass = self::paramEnvOrDefault(
             $handler,
-            self::MANTA_HTTP_HANDLER_KEY,
+            self::MANTA_HTTP_HANDLER_ENV_KEY,
             self::DEFAULT_HTTP_HANDLER,
             "handler"
         );
@@ -236,7 +250,8 @@ class MantaClient
         $argValue,
         $envKey,
         $default = null,
-        $argName = null
+        $argName = null,
+        $optional = false
     ) {
         if (!is_null($argValue) && !empty($argValue)) {
             return $argValue;
@@ -254,9 +269,11 @@ class MantaClient
             return $default;
         }
 
-        $msg = "You must set the [$argName] argument explicitly or set the " .
-            "environment variable [$envKey]";
-        throw new \InvalidArgumentException($msg);
+        if (!$optional) {
+            $msg = "You must set the [$argName] argument explicitly or set the " .
+                "environment variable [$envKey]";
+            throw new \InvalidArgumentException($msg);
+        }
     }
 
     /**
@@ -356,7 +373,9 @@ class MantaClient
         $sig = base64_encode($sig);
         $algo = strtolower($this->algo);
 
-        return sprintf(self::AUTH_HEADER, $this->login, $this->keyid, $algo, $sig);
+        $fullAccount = empty($this->subuser) ? $this->account : "{$this->account}/{$this->subuser}";
+
+        return sprintf(self::AUTH_HEADER, $fullAccount, $this->keyid, $algo, $sig);
     }
 
     /**
@@ -428,6 +447,7 @@ class MantaClient
                 $res->getReasonPhrase(),
                 $res->getStatusCode(),
                 $res->getHeaderLine('x-request-id'),
+                $path,
                 $jsonDetail
             );
         }
@@ -484,7 +504,27 @@ class MantaClient
      */
     public function getHomeDirectory()
     {
-        return "/{$this->login}";
+        return "/{$this->account}";
+    }
+
+    /**
+     * Returns the account used to connect to Manta.
+     *
+     * @return string account used to connect to Manta.
+     */
+    public function getAccount()
+    {
+        return $this->account;
+    }
+
+    /**
+     * Returns the subuser account used to connect to Manta
+     *
+     * @return null|string subuser account used to connect to Manta
+     */
+    public function getSubuser()
+    {
+        return $this->subuser;
     }
 
     /**
@@ -521,11 +561,11 @@ class MantaClient
      * @api
      *
      * @param  string  $directory       Name of directory
-     * @param  boolean $make_parents    Ensure parent directories exist
+     * @param  boolean $makeParents    Ensure parent directories exist
      *
      * @return MantaHeaderMultiResponse HTTP response object
      */
-    public function putDirectory($directory, $make_parents = false)
+    public function putDirectory($directory, $makeParents = false)
     {
         $headers = array(
             'Content-Type' => 'application/json; type=directory'
@@ -534,7 +574,7 @@ class MantaClient
         $resultHeaders = new MantaHeaderMultiResponse();
         $result = null;
 
-        if ($make_parents) {
+        if ($makeParents) {
             $parents = explode('/', $directory);
             $directoryTree = '';
 
@@ -545,7 +585,21 @@ class MantaClient
                     continue;
                 }
 
-                $result = $this->execute('PUT', $directoryTree, $headers);
+                $result = null;
+
+                /* We have to handler subuser situations specifically when
+                 * creating recursive directory trees because sometimes the
+                 * subuser doesn't have permissions to a base directory that
+                 * already exists, so we can rely on a NOOP from the put
+                 * operation for already existing directories. */
+                try {
+                     $result = $this->execute('PUT', $directoryTree, $headers);
+                } catch (MantaException $e) {
+                    if ($e->serverCode == 'NoMatchingRoleTag' && $makeParents) {
+                        continue;
+                    }
+                }
+
                 $resultHeaders->addHeaderToAllHeaders($result->getHeaders());
             }
         } else {
@@ -939,7 +993,7 @@ class MantaClient
         }
 
         $data = json_encode($body);
-        $response = $this->execute('POST', "/{$this->login}/jobs", $headers, $data, true);
+        $response = $this->execute('POST', "{$this->getHomeDirectory()}/jobs", $headers, $data, true);
         $location = $response->getHeaderLine('location');
         $jobId = self::extractJobIdFromLocation($location);
 
@@ -993,7 +1047,7 @@ class MantaClient
             'Content-Type' => 'text/plain'
         );
         $data = implode("\n", $inputs);
-        $response = $this->execute('POST', "/{$this->login}/jobs/{$job_id}/live/in", $headers, $data);
+        $response = $this->execute('POST', "{$this->getHomeDirectory()}/jobs/{$job_id}/live/in", $headers, $data);
 
         return new MantaHeaderResponse($response->getHeaders());
     }
@@ -1011,7 +1065,7 @@ class MantaClient
      */
     public function endJobInput($jobId)
     {
-        $response = $this->execute('POST', "/{$this->login}/jobs/{$jobId}/live/in/end");
+        $response = $this->execute('POST', "{$this->getHomeDirectory()}/jobs/{$jobId}/live/in/end");
 
         return new MantaHeaderResponse($response->getHeaders());
     }
@@ -1029,7 +1083,7 @@ class MantaClient
      */
     public function cancelJob($jobId)
     {
-        $response = $this->execute('POST', "/{$this->login}/jobs/{$jobId}/live/cancel");
+        $response = $this->execute('POST', "{$this->getHomeDirectory()}/jobs/{$jobId}/live/cancel");
 
         return array(
             'headers' => $response->getHeaders()
@@ -1047,7 +1101,7 @@ class MantaClient
      */
     public function listJobs()
     {
-        $response = $this->execute('GET', "/{$this->login}/jobs", null, null, true);
+        $response = $this->execute('GET', "{$this->getHomeDirectory()}/jobs", null, null, true);
 
         $headers = $response->getHeaders();
         $data = $this->parseJSONList($response->getBody());
@@ -1068,7 +1122,7 @@ class MantaClient
      */
     public function getJob($jobId)
     {
-        $response = $this->execute('GET', "/{$this->login}/jobs/{$jobId}/live/status", null, null, true);
+        $response = $this->execute('GET', "{$this->getHomeDirectory()}/jobs/{$jobId}/live/status", null, null, true);
         $headers = $response->getHeaders();
         $data = json_decode($response->getBody());
 
@@ -1108,7 +1162,7 @@ class MantaClient
      */
     public function getJobLiveOutputs($jobId)
     {
-        $response = $this->execute('GET', "/{$this->login}/jobs/{$jobId}/live/out", null, null, true);
+        $response = $this->execute('GET', "{$this->getHomeDirectory()}/jobs/{$jobId}/live/out", null, null, true);
 
         $headers = $response->getHeaders();
         $data = $this->parseTextList($response->getBody());
@@ -1131,7 +1185,7 @@ class MantaClient
      */
     public function getJobOutputs($jobId)
     {
-        $response = $this->execute('GET', "/{$this->login}/jobs/{$jobId}/out.txt", null, null, true);
+        $response = $this->execute('GET', "{$this->getHomeDirectory()}/jobs/{$jobId}/out.txt", null, null, true);
 
         $headers = $response->getHeaders();
         $data = $this->parseTextList($response->getBody());
@@ -1152,7 +1206,7 @@ class MantaClient
      */
     public function getJobInput($jobId)
     {
-        $response = $this->execute('GET', "/{$this->login}/jobs/{$jobId}/live/in", null, null, true);
+        $response = $this->execute('GET', "{$this->getHomeDirectory()}/jobs/{$jobId}/live/in", null, null, true);
 
         $headers = $response->getHeaders();
         $data = $this->parseTextList($response->getBody());
@@ -1175,7 +1229,7 @@ class MantaClient
      */
     public function getLiveJobFailures($jobId)
     {
-        $response = $this->execute('GET', "/{$this->login}/jobs/{$jobId}/live/fail", null, null, true);
+        $response = $this->execute('GET', "{$this->getHomeDirectory()}/jobs/{$jobId}/live/fail", null, null, true);
 
         $headers = $response->getHeaders();
         $data = $this->parseTextList($response->getBody());
@@ -1197,7 +1251,7 @@ class MantaClient
      */
     public function getJobFailures($jobId)
     {
-        $response = $this->execute('GET', "/{$this->login}/jobs/{$jobId}/fail.txt", null, null, true);
+        $response = $this->execute('GET', "{$this->getHomeDirectory()}/jobs/{$jobId}/fail.txt", null, null, true);
 
         $headers = $response->getHeaders();
         $data = $this->parseTextList($response->getBody());
@@ -1220,7 +1274,7 @@ class MantaClient
      */
     public function getLiveJobErrors($jobId)
     {
-        $response = $this->execute('GET', "/{$this->login}/jobs/{$jobId}/live/err", null, null, true);
+        $response = $this->execute('GET', "{$this->getHomeDirectory()}/jobs/{$jobId}/live/err", null, null, true);
 
         $headers = $response->getHeaders();
         $data = $this->parseJSONList($response->getBody());
@@ -1242,7 +1296,7 @@ class MantaClient
      */
     public function getJobErrors($jobId)
     {
-        $response = $this->execute('GET', "/{$this->login}/jobs/{$jobId}/err.txt", null, null, true);
+        $response = $this->execute('GET', "{$this->getHomeDirectory()}/jobs/{$jobId}/err.txt", null, null, true);
 
         $headers = $response->getHeaders();
         $data = $this->parseJSONList($response->getBody());

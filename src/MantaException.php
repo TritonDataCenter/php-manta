@@ -5,6 +5,7 @@ class MantaException extends \Exception
     public $serverCode;
     public $serverMessage;
     public $requestId;
+    public $path;
 
     /**
      * MantaException constructor.
@@ -12,9 +13,15 @@ class MantaException extends \Exception
      * @param string  $message     HTTP error message
      * @param integer $errorNo     HTTP error number
      * @param string  $requestId   UUID request id
+     * @param string  $path        Optional path to where the error occurred
      * @param string  $jsonDetails Raw JSON data
      */
-    public function __construct($message, $errorNo, $requestId, $jsonDetails = null)
+    public function __construct(
+        $message,
+        $errorNo,
+        $requestId,
+        $path = null,
+        $jsonDetails = null)
     {
         $details = null;
 
@@ -23,12 +30,16 @@ class MantaException extends \Exception
                 $errorDetails = json_decode($jsonDetails);
                 $this->serverCode = $errorDetails->{'code'};
                 $this->serverMessage = $errorDetails->{'message'};
+                $this->path = $path;
                 $this->requestId = $requestId;
 
+                $pathDetails = empty($path) ? '' : "[{$path}]";
+
                 $details = sprintf(
-                    '[%s] %s (%s)',
+                    '[%s] %s %s (%s)',
                     $this->serverCode,
                     $this->serverMessage,
+                    $pathDetails,
                     $this->requestId
                 );
             } catch (\Exception $e) {

@@ -111,9 +111,12 @@ class MantaClientDirectoryIT extends \PHPUnit_Framework_TestCase
             "Directory path should exist: {$dirPath}"
         );
 
+        // We skip running an operation of we are a subuser
+        $expectedNoOfHeaders = empty(self::$instance->getSubuser()) ? 6 : 5;
+
         $this->assertEquals(
             count($response->getAllHeaders()),
-            6,
+            $expectedNoOfHeaders,
             "An unexpected number of header results were returned"
         );
 
