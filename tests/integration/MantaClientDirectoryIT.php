@@ -238,4 +238,42 @@ class MantaClientDirectoryIT extends \PHPUnit_Framework_TestCase
         $foundObject3 = array_filter($contents, $nameMatcher($object3Name));
         $this->assertEquals(1, count($foundObject3));
     }
+
+    /** @test if we can detect a directory */
+    public function canDetectDirectory()
+    {
+        $dirPath = sprintf('%s/%s', self::$testDir, (string)Uuid::uuid4());
+        self::$instance->putDirectory($dirPath);
+
+        $this->assertTrue(
+            self::$instance->isDirectory($dirPath),
+            'Could not detect the presence of a directory'
+        );
+    }
+
+    /** @test if we can detect a directory */
+    public function canDetectNotDirectory()
+    {
+        $dirPath = sprintf('%s/%s', self::$testDir, (string)Uuid::uuid4());
+        self::$instance->putDirectory($dirPath);
+
+        $data = 'This is sample data';
+        $objectPath = sprintf("%s/%s", $dirPath, (string)Uuid::uuid4());
+        self::$instance->putObject($data, $objectPath);
+
+        $this->assertFalse(
+            self::$instance->isDirectory($objectPath),
+            'Could not detect the lack of a directory'
+        );
+    }
+
+    /** @test if we can get a directory's metadata */
+    public function canGetDirectoryMetadata() {
+        $dirPath = sprintf('%s/%s', self::$testDir, (string)Uuid::uuid4());
+        self::$instance->putDirectory($dirPath);
+
+        $metadata = self::$instance->getObjectMetadata($dirPath);
+
+        $this->assertNotNull($metadata->getHeaders());
+    }
 }

@@ -65,6 +65,8 @@ class MantaClient
     const MAXIMUM_PRIV_KEY_SIZE = 51200;
     /** Templated header used for HTTP signature authentication. */
     const AUTH_HEADER = 'Signature keyId="/%s/keys/%s",algorithm="%s",signature="%s"';
+    /** Content type for directories on Manta. */
+    const DIR_CONTENT_TYPE = 'application/x-json-stream; type=directory';
 
     // Properties
 
@@ -476,6 +478,16 @@ class MantaClient
     }
 
     /**
+     * Returns the home directory of the configured Manta user.
+     *
+     * @return string path to home directory of user
+     */
+    public function getHomeDirectory()
+    {
+        return "/{$this->login}";
+    }
+
+    /**
      * Determines if a given object or directory exists in Manta.
      *
      * @param string $path object path to check
@@ -485,6 +497,20 @@ class MantaClient
     {
         $result = $this->execute('HEAD', $path, array(), null, false);
         return $result->getStatusCode() == 200;
+    }
+
+    /**
+     * Returns TRUE if the given path is a directory.
+     *
+     * @param string $path path of object
+     * @return boolean TRUE if path is a directory
+     */
+    public function isDirectory($path)
+    {
+        $response = $this->execute('HEAD', $path);
+        $contentType = $response->getHeaderLine('Content-Type');
+
+        return $contentType == self::DIR_CONTENT_TYPE;
     }
 
     /**
@@ -591,7 +617,7 @@ class MantaClient
     public function listDirectory($directory)
     {
         $headers = array(
-            'Content-Type' => 'application/x-json-stream; type=directory'
+            'Content-Type' => self::DIR_CONTENT_TYPE
         );
         $response = $this->execute('GET', $directory, $headers, null, true);
         $body = $response->getBody();
@@ -826,6 +852,18 @@ class MantaClient
         }
 
         return new MantaStringResponse($filePath, $headers);
+    }
+
+    /**
+     * Returns the metadata associated with an object available via the
+     * HEAD request.
+     */
+    public function getObjectMetadata($path)
+    {
+        $response = $this->execute('HEAD', $path);
+        $headers = $response->getHeaders();
+
+        return new MantaHeaderResponse($headers);
     }
 
     /**
