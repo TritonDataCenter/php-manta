@@ -144,7 +144,7 @@ class MantaClient
             $account,
             self::MANTA_USER_ENV_KEY,
             null,
-            "login"
+            "account"
         );
 
         $this->subuser = self::paramEnvOrDefault(
