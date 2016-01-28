@@ -1,0 +1,12 @@
+language: php
+sudo: false
+
+php:
+ - '5.6'
+ - '7.0'
+ - hhvm
+ - nightly
+
+install: composer install
+
+script: php ./vendor/bin/phpcs -sw --standard=PSR2 src; php ./vendor/bin/phpunit -c ./phpunit.xml tests/unit;
