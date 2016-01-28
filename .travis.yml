@@ -7,6 +7,6 @@ php:
  - hhvm
  - nightly
 
-install: composer install
+install: composer install --no-interaction --prefer-source; mkdir -p $HOME/.ssh; ssh-keygen -t rsa -N "" -f $HOME/.ssh/id_rsa
 
 script: php ./vendor/bin/phpcs -sw --standard=PSR2 src; php ./vendor/bin/phpunit -c ./phpunit.xml tests/unit;
