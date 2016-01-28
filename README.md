@@ -10,6 +10,15 @@ Manta system.
  * [JSON](http://php.net/manual/en/json.installation.php) - Installed by default in newest versions
  * PHP 5.6+ or HHVM
 
+## Installation
+
+Install using the [packagist package](https://packagist.org/packages/joyent/php-manta) 
+via [composer](https://getcomposer.org/):
+
+```
+composer require joyent/php-manta
+```
+
 ## Configuration
 
 Php-manta can be configured using its constructor or by passing nulls and letting 
